@@ -361,6 +361,17 @@ check('no RRULE on any event (solar times differ every year, so they must not re
 check('Content-Disposition is not "attachment"',
 	stripos((string)$ics, 'attachment') === false);
 
+// RFC 5545 3.1: content lines are folded at 75 octets. Long lines are widely
+// tolerated, but this feed is consumed by Google, which has already proven
+// strict here, so keep inside the limit rather than relying on leniency.
+$long = array();
+foreach ( explode("\r\n", (string)$ics) as $line ){
+	if ( strlen($line) > 75 ){ $long[] = $line; }
+}
+check('no content line exceeds the 75-octet fold limit',
+	count($long) === 0,
+	count($long) . ' long lines; longest ' . ( $long ? strlen($long[0]) . ' octets: ' . substr($long[0], 0, 60) : '-' ));
+
 section('Calendar naming');
 
 check('X-WR-CALNAME is "Anamanta Kythings"',

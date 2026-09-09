@@ -121,7 +121,7 @@ PRODID:-//Anamanta//Kythings Solar Calendar//EN<?php echo "\r\n"; ?>
 CALSCALE:GREGORIAN<?php echo "\r\n"; ?>
 METHOD:PUBLISH<?php echo "\r\n"; ?>
 X-WR-CALNAME:Anamanta Kythings<?php echo "\r\n"; ?>
-X-WR-CALDESC:Daily solar times - sunrise\, solar noon\, sunset and solar midnight.<?php echo "\r\n"; ?>
+X-WR-CALDESC:Daily solar times for your location.<?php echo "\r\n"; //Kept short: RFC 5545 folds content lines at 75 octets ?>
 X-PUBLISHED-TTL:PT12H<?php echo "\r\n"; ?>
 REFRESH-INTERVAL;VALUE=DURATION:PT12H<?php echo "\r\n"; ?>
 <?php
@@ -334,7 +334,7 @@ DTEND:<?php echo dateToCal($event['end']+$gmt_math) . "\r\n"; ?>
 DTSTAMP:<?php echo dateToCal(time()) . "\r\n"; ?>
 LAST-MODIFIED:<?php echo dateToCal(filemtime(__FILE__)) . "\r\n"; ?>
 UID:<?php echo md5($date . '-' . $event_key . '@kythings.walkowiaks.com') . "\r\n"; /* Unique per event, per day. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" -- Google collapsed the whole feed to nothing. See the note above the foreach. */ ?>
-DESCRIPTION:<?php echo escapeString($event['name'] . ' at this location. One of the four Anamanta solar times.') . "\r\n"; ?>
+DESCRIPTION:<?php echo escapeString($event['name'] . ' - an Anamanta solar time.') . "\r\n"; /* Deliberately short. RFC 5545 folds content lines at 75 octets, and the longest event name here is "Astronomical Twilight", so this stays inside the limit without needing a folding routine. */ ?>
 URL;VALUE=URI:<?php echo escapeString('https://kythings.walkowiaks.com/') . "\r\n"; ?>
 SUMMARY:<?php echo escapeString($event['name'] . $last_sync) . "\r\n"; //Shows up in the title of the event ?>
 END:VEVENT<?php echo "\r\n"; ?>
