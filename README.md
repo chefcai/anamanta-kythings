@@ -138,11 +138,19 @@ Set `KYTHINGS_BASE_URL` if you serve it somewhere other than `https://kythings.w
 
 ### Security headers
 
-The image sends `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security` and a `Content-Security-Policy`
-on every response, set in `docker/default.conf` — see that file for the reasoning behind each one. `script-src` is a
-strict `'self'`: the builder page's own JavaScript lives entirely in same-origin `app.js`, with no inline `<script>`
-anywhere. If you fork this further and add inline script or a new external resource, the CSP will block it until
-`docker/default.conf` is updated to match — that is the policy doing its job, not a bug.
+The image sends `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, a `Content-Security-Policy`,
+`Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` and a locked-down `Permissions-Policy` on every response,
+set in `docker/default.conf` — see that file for the reasoning behind each one. `script-src` is a strict `'self'`: the
+builder page's own JavaScript lives entirely in same-origin `app.js`, with no inline `<script>` anywhere. If you fork
+this further and add inline script or a new external resource, the CSP will block it until `docker/default.conf` is
+updated to match — that is the policy doing its job, not a bug.
+
+`Cross-Origin-Embedder-Policy` is deliberately not set — its `require-corp` mode would block the cross-origin Google
+Fonts stylesheet and font files this page loads, for a header this single-page tool has no real use for (no
+`SharedArrayBuffer`, nothing needing process isolation). `X-XSS-Protection`, `Feature-Policy`, `Expect-CT` and
+`Public-Key-Pins` are also deliberately absent: all four are deprecated (misconfiguring `Public-Key-Pins` in
+particular can lock out your own domain), so a scanner listing them as missing is describing correct behavior, not a
+gap.
 
 The container has no TLS of its own — it is always meant to sit behind something that terminates TLS for it (Cloudflare
 Tunnel in production). It redirects HTTP to HTTPS by checking `X-Forwarded-Proto`, which Cloudflare (and most other

@@ -184,6 +184,9 @@ jobs:
           check "X-Content-Type-Options"
           check "Strict-Transport-Security"
           check "Content-Security-Policy"
+          check "Cross-Origin-Opener-Policy"
+          check "Cross-Origin-Resource-Policy"
+          check "Permissions-Policy"
 
           grep -qi "^X-Content-Type-Options:.*nosniff" headers.txt \
             || { echo "::error::X-Content-Type-Options is not nosniff"; exit 1; }
@@ -191,8 +194,23 @@ jobs:
             || { echo "::error::CSP missing frame-ancestors 'none'"; exit 1; }
           grep -qi "^Content-Security-Policy:.*script-src 'self'" headers.txt \
             || { echo "::error::CSP script-src is not a strict 'self' (inline script may have crept back in)"; exit 1; }
+          grep -qi "^Cross-Origin-Opener-Policy:.*same-origin" headers.txt \
+            || { echo "::error::Cross-Origin-Opener-Policy is not same-origin"; exit 1; }
+          grep -qi "^Cross-Origin-Resource-Policy:.*same-origin" headers.txt \
+            || { echo "::error::Cross-Origin-Resource-Policy is not same-origin"; exit 1; }
 
           echo "all header checks passed"
+
+      - name: Assert favicon is served, not 404
+        # A scan flagged /favicon.ico 404ing -- browsers request it by default
+        # regardless of any <link rel="icon"> in the page head. Both files
+        # ship in the image now; confirm they're actually reachable.
+        run: |
+          CODE_ICO=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8087/favicon.ico")
+          [ "$CODE_ICO" = "200" ] || { echo "::error::favicon.ico returned $CODE_ICO, expected 200"; exit 1; }
+          CODE_SVG=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8087/favicon.svg")
+          [ "$CODE_SVG" = "200" ] || { echo "::error::favicon.svg returned $CODE_SVG, expected 200"; exit 1; }
+          echo "favicon checks passed"
 
       - name: Assert HTTP-to-HTTPS redirect
         # The container has no TLS of its own, so this only fires off

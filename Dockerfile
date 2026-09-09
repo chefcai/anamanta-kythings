@@ -59,7 +59,7 @@ RUN printf '%s\n' \
 # external calls at all. ca-certificates is needed for the HTTPS geocode.
 RUN apk add --no-cache ca-certificates && rm -rf /var/cache/apk/*
 
-COPY --chown=nobody:nobody sun.php index.php app.js /var/www/html/
+COPY --chown=nobody:nobody sun.php index.php app.js favicon.ico favicon.svg /var/www/html/
 
 # Security response headers. The base image ships its own conf.d/default.conf
 # with no headers of this kind, so it is replaced wholesale rather than
