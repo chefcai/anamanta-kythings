@@ -390,7 +390,7 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</details>
 
 	<label for="tz">Timezone <span class="hint">&mdash; IANA name, for example America/Los_Angeles</span></label>
-	<input type="text" id="tz" name="tz" list="tzlist" value="<?php echo e($in_tz); ?>" placeholder="America/Los_Angeles"
+	<input type="text" id="tz" name="tz" list="tzlist" value="<?php echo e($in_tz); ?>" placeholder="<?php echo e(DEFAULT_TZ); ?>"
 		autocomplete="off"
 		onfocus="this.dataset.prevTz = this.value; this.value = '';"
 		onblur="if ( this.value === '' ) { this.value = this.dataset.prevTz || ''; }">
