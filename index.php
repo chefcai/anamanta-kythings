@@ -303,14 +303,17 @@ $tz_list = timezone_identifiers_list();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Anamanta Solar Calendar &mdash; build your subscription link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&display=swap" rel="stylesheet">
 <style>
-	:root { --ink:#1d2021; --dim:#5f6769; --line:#d8d4cc; --bg:#faf8f4; --accent:#7a4b12; --warm:#f2ece0; }
+	:root { --ink:#1d2021; --dim:#5f6769; --line:#d8d4cc; --bg:#f2f8f4; --accent:#1d5c2e; --warm:#e8f3ec; }
 	* { box-sizing:border-box; }
 	body { margin:0; padding:2rem 1rem 4rem; background:var(--bg); color:var(--ink);
 	       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
 	.wrap { max-width:41rem; margin:0 auto; }
-	h1 { font-size:1.6rem; margin:0 0 .3rem; letter-spacing:-.01em; }
-	h2 { font-size:1.05rem; margin:2.2rem 0 .6rem; }
+	h1 { font-family:'Cinzel',Georgia,serif; font-weight:600; font-size:1.6rem; margin:0 0 .3rem; letter-spacing:-.01em; }
+	h2 { font-family:'Cinzel',Georgia,serif; font-weight:500; font-size:1.05rem; margin:2.2rem 0 .6rem; }
 	h3 { font-size:.95rem; margin:1.3rem 0 .3rem; }
 	.sub { color:var(--dim); margin:0 0 2rem; }
 	fieldset { border:1px solid var(--line); border-radius:8px; padding:1rem 1.1rem 1.2rem; margin:0 0 1.1rem; background:#fff; }
