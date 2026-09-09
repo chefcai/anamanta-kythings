@@ -1,63 +1,192 @@
-# Daylight Calendar ICS
+# Anamanta Kythings — solar calendar feed
 
-This is a dynamically generated .ics calendar that you can host and subscribe to in Google Calendar, iCal, or other calendar software.
+A self-hosted calendar you can subscribe to that marks the four Anamanta solar times each day, wherever you are:
 
-Not only will it provide an event each day with the appropriate sunrise and sunset time, it will show the length of the day in hours/minutes as well as in a percent (of 24 hours) and the solar noon for that day. It will also give a percentile compared to the shortest and longest days of the year!
+**Sunrise · Solar noon · Sunset · Solar midnight**
 
-## Options
+Live at **<https://kythings.walkowiaks.com/>**
 
-- [Find your geo coordinates](https://www.latlong.net/)
-- [Find your timezone name](https://www.php.net/manual/en/timezones.php)
-- [Find your GMT offset](http://en.wikipedia.org/wiki/List_of_UTC_time_offsets#mediaviewer/File:World_Time_Zones_Map.png)
+Solar noon here is the real thing — the moment the sun actually crosses the meridian, from PHP's
+`date_sun_info()` transit. It is not 12:00 on the clock, and depending on your longitude and the time of year the
+two can differ by half an hour. Solar midnight is the anti-transit, the midpoint between one day's transit and the
+next, so it stays correct across a year boundary rather than drifting.
 
-## Instructions
+---
 
-- Upload `daylight.php` and/or `sun.php` to your server (or skip this step and use the one hosted on [gearside.com](https://gearside.com/calendars/daylight.php))
-- Point your calendar to the file and use query parameters for the options above.
-  - Latitude: `lat`
-  - Longitude: `lng`
-  - Timezone (preferred way): `timezone`
-  - GMT Offset (alternate way): `gmt`
-  - Year: `year`
-  - Event types (`sun.php` only):
-    - `actual`
-    - `civil`
-    - `nautical`
-    - `astronomical`
-    - `all`
+## Using it
 
-Use `?debug` to directly view the calendar file in a browser with events more easily readable. Be sure not to use `?debug` when subscribing to your calendar as it does not declare itself as an .ics file with that parameter present.
+Go to **<https://kythings.walkowiaks.com/>**, type a town, and it builds the subscription address for you. You
+should never need to hand-edit a query string.
 
-## Examples
+The page defaults to a five-minute event length, which is what the practice calls for, and to all four times
+enabled. A town is enough — solar times vary by seconds across a town, so a street address gives an identical
+calendar.
 
-#### Basic
+### Subscribing
 
-Most reliable method:
-`https://gearside.com/calendars/daylight.php?lat=43.1234&lng=-76.1234&timezone=America/New_York`
+> **Google Calendar: use a desktop browser.** Google does not allow subscribing to an outside calendar from the
+> Google Calendar app on Android, iPhone or iPad. That is Google's limitation, not this project's. Subscribe once
+> on a computer and it syncs to all your devices afterwards.
 
-Your mileage may vary if only passing GMT offset:
-`https://gearside.com/calendars/daylight.php?lat=43.1234&lng=-76.1234&gmt=-5`
+The builder page gives you a one-click Google link, a `webcal://` link for Apple Calendar, and the raw address for
+anything else.
 
-`https://gearside.com/calendars/sun.php?lat=43.1234&lng=-76.1234&gmt=-5&all`
+Two things worth knowing once subscribed:
 
-## Notes
+- **Updates are not instant.** Google refreshes subscribed calendars roughly every 12–24 hours.
+- **Set your own notification if you want an alert.** Google generally ignores reminders built into a subscribed
+  calendar. Set a default notification on the subscribed calendar itself, once, in your calendar app's settings.
 
-Calendar software caches remote .ics files (like this one), so when replacing it you can "bust" the cache by adding another query parameter of random characters such as `&sdfgsfd`.
+---
 
-- [More information available at Gearside.com](https://gearside.com/google-daylight-calendar/)
+## The feed directly
 
-## About this fork
+If you would rather build the URL yourself, `sun.php` takes these query parameters:
 
-This is a fork of [chrisblakley/Daylight-Calendar-ICS](https://github.com/chrisblakley/Daylight-Calendar-ICS)
-by Chris Blakley / Gearside, which is the origin of `sun.php`, `daylight.php` and `nighttime.php` and of the
-sunrise/sunset and twilight calculations. All credit for the original work is his.
+| Parameter | Meaning | Default |
+| --- | --- | --- |
+| `lat` | Latitude, decimal degrees | `43.0469` |
+| `lng` | Longitude, decimal degrees | `-76.1444` |
+| `gmt` | UTC offset, **whole hours only** | `-5` |
+| `year` | Calendar year to generate | current year |
+| `length` | Event duration in minutes | `15` |
 
-This fork adds, for self-hosting at `kythings.walkowiaks.com`:
+Event types are flags — their presence is what counts, so `?noon` and `?noon=1` behave identically:
 
-- `noon` and `midnight` event types, using `date_sun_info()` transit rather than clock noon
-- `index.php`, a subscription URL builder
-- a container image and a CI/publish pipeline
+| Flag | Events |
+| --- | --- |
+| `actual` | Sunrise **and** sunset |
+| `noon` | Solar noon |
+| `midnight` | Solar midnight |
+| `civil` | Civil twilight, morning and evening |
+| `nautical` | Nautical twilight |
+| `astronomical` | Astronomical twilight |
+| `all` | All six of the above |
 
-It also changes the calendar's identity to "Anamanta Kythings", gives every event a unique UID and drops the
-per-event yearly `RRULE`. The last two were necessary: sharing one UID across every event on a date, plus a
-recurrence rule, made Google Calendar render the subscription empty.
+Add `?debug` to read the output in a browser instead of downloading it. Do not leave `?debug` in a URL you
+subscribe to — with it present the response is not declared as a calendar file.
+
+Example, the four Anamanta times for Worthington, Massachusetts:
+
+```
+https://kythings.walkowiaks.com/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&actual&noon&midnight
+```
+
+### Known limits
+
+- **`sun.php` has no `timezone` parameter.** Only `gmt`, in whole hours. (Upstream's `daylight.php` accepts an IANA
+  name; `sun.php` never has.) This costs nothing in practice: every `DTSTART` is an absolute UTC instant, so your
+  calendar app shows correct local times all year, daylight saving included. The offset only decides which local
+  day an event is filed under. The builder page takes an IANA name and converts it for you.
+- **Sunrise and sunset cannot be requested separately.** They share the `actual` flag. Hide the one you do not want
+  in your calendar app.
+- **Once or twice a year, one calendar day carries two solar midnights** and the next day's arrives at 23:59 the
+  evening before. Successive anti-transits are not exactly 24 hours apart, so this is unavoidable; the alternative
+  would be publishing a time that is deliberately wrong.
+
+---
+
+## Running your own
+
+The image is public and self-contained — the code is baked in, so pulling it is the whole deployment.
+
+```yaml
+  kythings:
+    image: ghcr.io/chefcai/anamanta-kythings:latest
+    container_name: kythings
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+    ports:
+      - "127.0.0.1:8087:8080"
+```
+
+```sh
+docker compose pull kythings && docker compose up -d kythings
+```
+
+Two settings are not optional:
+
+- **`display_errors` must be Off.** `sun.php` calls `date_sunrise()`/`date_sunset()`, deprecated since PHP 8.1. On
+  PHP 8.5 they emit two notices per call site — thousands for a full year — and with display on those land in the
+  response body and corrupt the calendar. The image sets this; if you build your own, do the same.
+- **The timezone must be UTC.** `dateToCal()` formats in the server's default timezone but labels the result `Z`.
+  A non-UTC container emits wrong timestamps that still look perfectly well-formed.
+
+Both are asserted in CI rather than trusted.
+
+Set `KYTHINGS_BASE_URL` if you serve it somewhere other than `https://kythings.walkowiaks.com`.
+
+---
+
+## Development
+
+```
+sun.php               the feed
+index.php             the subscription URL builder
+Dockerfile            self-contained nginx + php-fpm image
+tests/validate.php    50 acceptance checks
+tests/regression.sh   17 request shapes diffed against unmodified upstream
+tests/generate.php    CLI harness for running sun.php without a web server
+```
+
+Run the suite the way CI does, inside the image, so you are testing the runtime that ships:
+
+```sh
+docker build -t kythings:dev .
+git show upstream/master:sun.php > sun_upstream.php
+docker run --rm -v "$PWD":/app -w /app kythings:dev php  /app/tests/validate.php
+docker run --rm -v "$PWD":/app -w /app kythings:dev sh   /app/tests/regression.sh
+```
+
+`tests/validate.php` covers the three date scenarios that matter for solar arithmetic — an ordinary day, both
+daylight-saving transitions, and 31 December into 1 January checked at **both** ends of the feed — plus assertions
+that solar noon is never clock noon, that consecutive events stay 24 hours apart in absolute time, and that no PHP
+diagnostics leak into the body.
+
+`tests/regression.sh` exists to keep this fork honest: it generates the same 17 request shapes from unmodified
+upstream `sun.php` and from this one and requires the event instants to be identical. Adding features should not
+move anybody's existing sunrise.
+
+### Pipeline
+
+- **CI** runs on every push and pull request. It builds the image and runs every check inside it, then serves the
+  image and inspects the actual HTTP response.
+- **Publish** runs on merge to `master`, re-runs the whole suite, and pushes to GHCR as `:latest` and
+  `:sha-<short>`.
+- **Deploying is a pull.** The pipeline never touches the server — nothing here holds an SSH key or any credential
+  for it. Roll back by pointing the compose `image:` at an earlier `:sha-` tag and pulling again.
+
+---
+
+## What this fork changed
+
+Beyond the two new event types and the builder page, three changes to the feed itself were needed to make Google
+Calendar accept it. All were pre-existing upstream behaviour:
+
+1. **Every event on a date shared one UID** (`md5($date)`). RFC 5545 treats UID as the identity of a component, so
+   several events sharing one, with no `RECURRENCE-ID`, are not several events — they are one event redefined
+   contradictorily. Subscribing produced a completely empty calendar. UIDs are now unique per event per day.
+2. **`RRULE:FREQ=YEARLY;COUNT=3` on every event**, repeating each day's times in the two following years. That is
+   simply wrong for a solar calendar — sunrise on 3 March 2027 is not at 2026's time — and on top of duplicated
+   UIDs it made the feed unrenderable. Removed.
+3. **`Content-Disposition: attachment`** changed to `inline`. This is a feed to poll, not a file to download.
+
+The calendar's identity is now "Anamanta Kythings" in `X-WR-CALNAME`, `PRODID` and the per-event `DESCRIPTION` and
+`URL`.
+
+---
+
+## Credits and licence
+
+This is a fork of **[chrisblakley/Daylight-Calendar-ICS](https://github.com/chrisblakley/Daylight-Calendar-ICS)**
+by **Chris Blakley / Gearside**. `sun.php`, `daylight.php`, `nighttime.php` and `calendar.html`, and all of the
+sunrise, sunset and twilight calculation, are his work. This fork adds the solar noon and solar midnight event
+types, the builder page, the container and the pipeline, and the calendar-compatibility fixes above. The original
+project is documented at [gearside.com](https://gearside.com/google-daylight-calendar/).
+
+Licensed under the **GNU General Public License v2.0**, the same licence as the upstream project — see
+[LICENSE](LICENSE). Copyright notices are retained, and any derivative of this work must remain under GPL-2.0.
+
+**Please do not report issues with this fork upstream.** The bugs are mine, not Chris Blakley's — raise them on
+this repository.
