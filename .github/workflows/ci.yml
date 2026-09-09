@@ -155,6 +155,63 @@ jobs:
 
           echo "all smoke checks passed"
 
+      - name: Assert security headers on the served response
+        # These come from docker/default.conf, not from PHP, so they have no
+        # coverage in tests/validate.php (which runs sun.php directly, no
+        # nginx in front of it). Checked against both a normal 200 and an
+        # error response, since add_header only fires on error pages when the
+        # directive uses `always` -- the one thing that is easy to typo away
+        # without a test noticing.
+        run: |
+          curl -fsSD headers.txt "http://127.0.0.1:8087/index.php" -o /dev/null
+          curl -sD headers-404.txt "http://127.0.0.1:8087/does-not-exist" -o /dev/null
+
+          check() {
+            grep -qi "^$1:" headers.txt || { echo "::error::missing header on 200 response: $1"; exit 1; }
+            grep -qi "^$1:" headers-404.txt || { echo "::error::missing header on 404 response (add_header needs 'always'): $1"; exit 1; }
+          }
+          check "X-Frame-Options"
+          check "X-Content-Type-Options"
+          check "Strict-Transport-Security"
+          check "Content-Security-Policy"
+
+          grep -qi "^X-Content-Type-Options:.*nosniff" headers.txt \
+            || { echo "::error::X-Content-Type-Options is not nosniff"; exit 1; }
+          grep -qi "^Content-Security-Policy:.*frame-ancestors 'none'" headers.txt \
+            || { echo "::error::CSP missing frame-ancestors 'none'"; exit 1; }
+          grep -qi "^Content-Security-Policy:.*script-src 'self'" headers.txt \
+            || { echo "::error::CSP script-src is not a strict 'self' (inline script may have crept back in)"; exit 1; }
+
+          echo "all header checks passed"
+
+      - name: Assert HTTP-to-HTTPS redirect
+        # The container has no TLS of its own, so this only fires off
+        # X-Forwarded-Proto -- the header a TLS-terminating proxy in front of
+        # it (Cloudflare Tunnel in production) sets to the scheme the visitor
+        # actually used. All three cases matter: a proxied http visit must
+        # redirect, a proxied https visit must NOT be redirected again (that
+        # would be a loop in production), and a direct request with no such
+        # header must also pass through untouched.
+        run: |
+          CODE_HTTP=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: http' "http://127.0.0.1:8087/")
+          LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' -H 'X-Forwarded-Proto: http' "http://127.0.0.1:8087/")
+          echo "proxied http visit: $CODE_HTTP -> $LOCATION"
+          [ "$CODE_HTTP" = "301" ] || { echo "::error::proxied http visit was not redirected (got $CODE_HTTP)"; exit 1; }
+          case "$LOCATION" in
+            https://*) ;;
+            *) echo "::error::redirect target is not https: $LOCATION"; exit 1 ;;
+          esac
+
+          CODE_HTTPS=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' "http://127.0.0.1:8087/")
+          echo "proxied https visit: $CODE_HTTPS"
+          [ "$CODE_HTTPS" = "200" ] || { echo "::error::proxied https visit was redirected too (redirect loop risk) - got $CODE_HTTPS"; exit 1; }
+
+          CODE_DIRECT=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8087/")
+          echo "direct, unproxied visit: $CODE_DIRECT"
+          [ "$CODE_DIRECT" = "200" ] || { echo "::error::direct request with no X-Forwarded-Proto was redirected - it has nowhere real to go"; exit 1; }
+
+          echo "all redirect checks passed"
+
       - name: Container logs on failure
         if: failure()
         run: docker logs kythings-smoke || true
