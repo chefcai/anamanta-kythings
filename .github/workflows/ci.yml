@@ -158,13 +158,23 @@ jobs:
       - name: Assert security headers on the served response
         # These come from docker/default.conf, not from PHP, so they have no
         # coverage in tests/validate.php (which runs sun.php directly, no
-        # nginx in front of it). Checked against both a normal 200 and an
+        # nginx in front of it). Checked against both a normal 200 and a real
         # error response, since add_header only fires on error pages when the
         # directive uses `always` -- the one thing that is easy to typo away
         # without a test noticing.
+        #
+        # The "error" path has to be a nonexistent .php file, not just any
+        # unmatched path: `location / { try_files $uri $uri/ /index.php...; }`
+        # (inherited unchanged from the base image) routes anything else to
+        # index.php with a 200, front-controller style. Only the `location ~
+        # \.php$ { try_files $uri =404; ... }` block actually 404s. Asserting
+        # the status code too, not just headers, so this can't silently drift
+        # back to testing a 200 again.
         run: |
           curl -fsSD headers.txt "http://127.0.0.1:8087/index.php" -o /dev/null
-          curl -sD headers-404.txt "http://127.0.0.1:8087/does-not-exist" -o /dev/null
+          CODE_404=$(curl -sD headers-404.txt -o /dev/null -w '%{http_code}' "http://127.0.0.1:8087/nonexistent.php")
+          echo "error-path status: $CODE_404"
+          [ "$CODE_404" = "404" ] || { echo "::error::expected a real 404 from a nonexistent .php path, got $CODE_404"; exit 1; }
 
           check() {
             grep -qi "^$1:" headers.txt || { echo "::error::missing header on 200 response: $1"; exit 1; }
