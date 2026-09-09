@@ -412,10 +412,10 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 <fieldset>
 	<legend>What to include</legend>
 	<div class="checks">
-		<label><input type="checkbox" name="t_sunrise"  value="1" <?php echo $want['sunrise']  ? 'checked' : ''; ?>> Sunrise</label>
-		<label><input type="checkbox" name="t_noon"     value="1" <?php echo $want['noon']     ? 'checked' : ''; ?>> Solar noon</label>
-		<label><input type="checkbox" name="t_sunset"   value="1" <?php echo $want['sunset']   ? 'checked' : ''; ?>> Sunset</label>
-		<label><input type="checkbox" name="t_midnight" value="1" <?php echo $want['midnight'] ? 'checked' : ''; ?>> Solar midnight</label>
+		<label for="t_sunrise"><input type="checkbox" id="t_sunrise" name="t_sunrise" value="1" <?php echo $want['sunrise']  ? 'checked' : ''; ?>> Sunrise</label>
+		<label for="t_noon"><input type="checkbox" id="t_noon" name="t_noon" value="1" <?php echo $want['noon']     ? 'checked' : ''; ?>> Solar noon</label>
+		<label for="t_sunset"><input type="checkbox" id="t_sunset" name="t_sunset" value="1" <?php echo $want['sunset']   ? 'checked' : ''; ?>> Sunset</label>
+		<label for="t_midnight"><input type="checkbox" id="t_midnight" name="t_midnight" value="1" <?php echo $want['midnight'] ? 'checked' : ''; ?>> Solar midnight</label>
 	</div>
 	<p class="hint" style="margin:.6rem 0 0;">Sunrise and sunset come as a pair from the feed, so ticking either includes both.</p>
 
