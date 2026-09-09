@@ -320,7 +320,7 @@ $tz_list = timezone_identifiers_list();
 	legend { padding:0 .4rem; font-weight:600; font-size:.9rem; }
 	label { display:block; margin:.7rem 0 .2rem; font-size:.9rem; font-weight:600; }
 	.hint { font-weight:400; color:var(--dim); font-size:.85rem; }
-	input[type=text], input[type=number] { width:100%; padding:.55rem .6rem; border:1px solid var(--line);
+	input[type=text], input[type=number] { width:100%; padding:.55rem .6rem; border:1px solid var(--dim);
 	       border-radius:6px; font-size:1rem; background:#fff; color:var(--ink); }
 	input:focus { outline:2px solid var(--accent); outline-offset:1px; }
 	.row { display:flex; gap:.8rem; } .row > div { flex:1; }
@@ -329,6 +329,12 @@ $tz_list = timezone_identifiers_list();
 	button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.7rem 1.4rem;
 	       font-size:1rem; font-weight:600; cursor:pointer; }
 	button:hover { filter:brightness(1.12); }
+	.skip-link { position:absolute; top:-40px; left:0; background:var(--accent); color:#fff; z-index:100;
+	       padding:.6rem 1rem; border-radius:0 0 6px 0; text-decoration:none; font-weight:600; }
+	.skip-link:focus { top:0; }
+	.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+	       clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+	.ext-icon { display:inline-block; }
 	.err, .note { border-radius:6px; padding:.7rem .9rem; margin:0 0 .9rem; font-size:.92rem; }
 	.err { background:#fdecea; border:1px solid #e5b3ad; }
 	.note { background:var(--warm); border:1px solid var(--line); }
@@ -349,7 +355,8 @@ $tz_list = timezone_identifiers_list();
 </style>
 </head>
 <body>
-<div class="wrap">
+<a class="skip-link" href="#main">Skip to main content</a>
+<main id="main" class="wrap">
 
 <h1>Anamanta Solar Calendar</h1>
 <p class="sub">Build a calendar you can subscribe to that marks the four solar times each day &mdash;
@@ -376,7 +383,7 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 		<summary>Or enter coordinates directly</summary>
 		<p class="hint" style="margin:.5rem 0;">Use these if the lookup above cannot find your town.
 		<a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer">Find your latitude and
-		longitude</a>. If you fill these in they take precedence over the town name.</p>
+		longitude<span class="ext-icon" aria-hidden="true"> &#8599;</span><span class="sr-only"> (opens in new tab)</span></a>. If you fill these in they take precedence over the town name.</p>
 		<div class="row">
 			<div>
 				<label for="lat">Latitude</label>
@@ -397,7 +404,7 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</datalist>
 	<p class="hint" style="margin:.35rem 0 0;">Click the field to see the full list of <?php echo count($tz_list); ?> timezones,
 		or start typing to search it. Full list also at
-		<a href="https://www.php.net/manual/en/timezones.php" target="_blank" rel="noopener noreferrer">php.net/timezones</a>.
+		<a href="https://www.php.net/manual/en/timezones.php" target="_blank" rel="noopener noreferrer">php.net/timezones<span class="ext-icon" aria-hidden="true"> &#8599;</span><span class="sr-only"> (opens in new tab)</span></a>.
 		This only decides which day each event is filed under &mdash; your calendar app always shows the times in your own
 		timezone, and handles daylight saving for you.</p>
 </fieldset>
@@ -443,14 +450,14 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 		Apple Calendar is the exception: the Apple button below does work directly on an iPhone or iPad.</p>
 
 	<p class="btnrow">
-		<a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
+		<a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Add to Google Calendar<span class="ext-icon" aria-hidden="true"> &#8599;</span><span class="sr-only"> (opens in new tab)</span></a>
 		<a class="btnlink" href="<?php echo e($result['webcal']); ?>">Add to Apple Calendar</a>
-		<a class="btnlink" href="<?php echo e($result['outlook']); ?>" target="_blank" rel="noopener noreferrer">Add to Outlook</a>
+		<a class="btnlink" href="<?php echo e($result['outlook']); ?>" target="_blank" rel="noopener noreferrer">Add to Outlook<span class="ext-icon" aria-hidden="true"> &#8599;</span><span class="sr-only"> (opens in new tab)</span></a>
 	</p>
 
 	<p class="meta">
 		<strong>Google</strong> shows an <em>Add calendar</em> confirmation with the address &mdash; click <em>Add</em>.
-		If nothing happens, try the <a href="<?php echo e($result['googlealt']); ?>" target="_blank" rel="noopener noreferrer">alternate link</a>.
+		If nothing happens, try the <a href="<?php echo e($result['googlealt']); ?>" target="_blank" rel="noopener noreferrer">alternate link<span class="ext-icon" aria-hidden="true"> &#8599;</span><span class="sr-only"> (opens in new tab)</span></a>.
 		<strong>Apple</strong> hands off to the Calendar app and asks you to confirm.
 		<strong>Outlook</strong> opens Outlook on the web with the address pre-filled.
 		If any button does not do what you expect, use the address below &mdash; it works everywhere and takes one paste.
@@ -502,6 +509,6 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 <?php endif; ?>
 <script src="app.js" defer></script>
 
-</div>
+</main>
 </body>
 </html>
