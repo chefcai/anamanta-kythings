@@ -70,6 +70,15 @@ All notable changes to this project are documented here.
   CSS alone. A custom control would fix it but adds real complexity and
   risk for a boundary most browsers already render with reasonable
   contrast by default; left alone unless it's specifically flagged.
+- The 4 "What to include" checkboxes were already inside a wrapping
+  `<label>` (`<label><input ...> Sunrise</label>`), which is a valid,
+  spec-compliant way to associate a label under WCAG 1.3.1 — screen
+  readers already announced them correctly. A scan flagged them as
+  "missing labels" anyway; some automated checkers only credit the
+  explicit `<label for="id">` form and don't recognise implicit
+  wrapping. Added matching `id`/`for` pairs alongside the existing
+  wrapping (belt and suspenders, not a behavior change) so it reads
+  correctly to tools that don't credit the implicit form either.
 
 ### Fixed
 
