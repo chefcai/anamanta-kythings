@@ -109,6 +109,49 @@ $gmt = ( isset($_GET['gmt']) )? intval($_GET['gmt']) : -5;
 $length = ( isset($_GET['length']) )? intval($_GET['length']) : 15;
 $gmt_math = ($gmt*3600)*-1;
 
+/*
+	Rolling window versus a fixed year.
+
+	A feed pinned to one calendar year is broken every New Year: it stops dead on
+	31 December, and because calendar clients only refetch every 12-24 hours it
+	does not even self-heal until some time on 1 January. Anyone looking ahead on
+	New Year's Eve sees nothing.
+
+	Since this file is generated per request, the fix is to generate a window
+	relative to today and let it slide forward on every fetch. It never runs out,
+	and the problem stops existing rather than being documented.
+
+	Passing ?year=NNNN still selects that exact calendar year, with byte-identical
+	output to before, so anything already relying on it is unaffected.
+
+	  (default)     today - 30 days .. today + 18 months
+	  ?months=N     window length forward, 1-36
+	  ?back=N       days of history to keep, 0-365
+	  ?year=NNNN    legacy fixed-year mode
+
+	The '+1 year' shift below is upstream's: its loop runs over the *previous*
+	year and every event is built as strtotime($date . '+1 year ' . $time). That
+	is preserved exactly for fixed-year mode. In rolling mode the shift is empty
+	and $date is simply the event's own date, which also sidesteps the leap-day
+	special-casing at the bottom of the loop.
+*/
+$rolling = !isset($_GET['year']);
+
+if ( $rolling ){
+	$months = ( isset($_GET['months']) ) ? intval($_GET['months']) : 18;
+	$months = max(1, min(36, $months));
+	$back   = ( isset($_GET['back']) ) ? intval($_GET['back']) : 30;
+	$back   = max(0, min(365, $back));
+
+	$year_shift = '';
+	$loop_start = date('Y-m-d', strtotime("-{$back} days"));
+	$loop_end   = date('Y-m-d', strtotime("+{$months} months"));
+} else {
+	$year_shift = '+1 year';
+	$loop_start = $year-1 . '-01-01';
+	$loop_end   = $year-1 . '-12-31';
+}
+
 $syracuse = ( $lat == 43.0469 && $lng == -76.1444 ) ? 1: 0;
 if ( $syracuse ){
 	date_default_timezone_set('America/New_York'); //This is only used for the "Last Updated" date
@@ -125,8 +168,8 @@ X-WR-CALDESC:Daily solar times for your location.<?php echo "\r\n"; //Kept short
 X-PUBLISHED-TTL:PT12H<?php echo "\r\n"; ?>
 REFRESH-INTERVAL;VALUE=DURATION:PT12H<?php echo "\r\n"; ?>
 <?php
-$date = $year-1 . '-01-01'; //Subtract one year so it can carry over at the end of the year/beginning of the year (this messes up leap years, so refer to conditional at the very bottom).
-while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) == strtotime($year . '-02-29') ): //The or statement is just for leap days
+$date = $loop_start; //Fixed-year mode starts a year back so events carry over the year boundary; rolling mode starts at the real first day of the window.
+while ( strtotime($date) <= strtotime($loop_end) || ( !$rolling && strtotime($date) == strtotime($year . '-02-29') ) ): //The or statement is just for leap days, and only applies in fixed-year mode
 	$events = array(
 		'sunrise' => array(
 			'start' => 0,
@@ -196,8 +239,8 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 
 	//Need to do this separate from and after the creation of the above array so it can self-reference other keys
 	if ( isset($_GET['actual']) || isset($_GET['all']) ){
-		$events['sunrise']['start'] = strtotime($date . '+1 year ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 90.83, $gmt));
-		$events['sunset']['start'] = strtotime($date . '+1 year ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 90.83, $gmt));
+		$events['sunrise']['start'] = strtotime($date . $year_shift . ' ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 90.83, $gmt));
+		$events['sunset']['start'] = strtotime($date . $year_shift . ' ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 90.83, $gmt));
 		$events['sunrise']['length'] = $length*60; //Minutes in seconds (Default: 15 minutes)
 		$events['sunset']['length'] = $length*60; //Minutes in seconds (Default: 15 minutes)
 		$events['sunrise']['end'] = $events['sunrise']['start']+$events['sunrise']['length'];
@@ -205,8 +248,8 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 	}
 
 	if ( isset($_GET['civil']) || isset($_GET['all']) ){
-		$events['civil morning']['start'] = strtotime($date . '+1 year ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 96, $gmt));
-		$events['civil evening']['start'] = strtotime($date . '+1 year ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 96, $gmt));
+		$events['civil morning']['start'] = strtotime($date . $year_shift . ' ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 96, $gmt));
+		$events['civil evening']['start'] = strtotime($date . $year_shift . ' ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 96, $gmt));
 		$events['civil morning']['length'] = $events['sunrise']['start']-$events['civil morning']['start'];
 		$events['civil evening']['length'] = $events['civil evening']['start']-$events['sunset']['start'];
 		$events['civil morning']['end'] = $events['civil morning']['start']+$events['civil morning']['length'];
@@ -214,8 +257,8 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 	}
 
 	if ( isset($_GET['nautical']) || isset($_GET['all']) ){
-		$events['nautical morning']['start'] = strtotime($date . '+1 year ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 102, $gmt));
-		$events['nautical evening']['start'] = strtotime($date . '+1 year ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 102, $gmt));
+		$events['nautical morning']['start'] = strtotime($date . $year_shift . ' ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 102, $gmt));
+		$events['nautical evening']['start'] = strtotime($date . $year_shift . ' ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 102, $gmt));
 		$events['nautical morning']['length'] = $events['civil morning']['start']-$events['nautical morning']['start'];
 		$events['nautical evening']['length'] = $events['nautical evening']['start']-$events['civil evening']['start'];
 		$events['nautical morning']['end'] = $events['nautical morning']['start']+$events['nautical morning']['length'];
@@ -223,8 +266,8 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 	}
 
 	if ( isset($_GET['astronomical']) || isset($_GET['all']) ){
-		$events['astronomical morning']['start'] = strtotime($date . '+1 year ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 108, $gmt));
-		$events['astronomical evening']['start'] = strtotime($date . '+1 year ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 108, $gmt));
+		$events['astronomical morning']['start'] = strtotime($date . $year_shift . ' ' . date_sunrise(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 108, $gmt));
+		$events['astronomical evening']['start'] = strtotime($date . $year_shift . ' ' . date_sunset(strtotime($date), SUNFUNCS_RET_STRING, $lat, $lng, 108, $gmt));
 		$events['astronomical morning']['length'] = $events['nautical morning']['start']-$events['astronomical morning']['start'];
 		$events['astronomical evening']['length'] = $events['astronomical evening']['start']-$events['nautical evening']['start'];
 		$events['astronomical morning']['end'] = $events['astronomical morning']['start']+$events['astronomical morning']['length'];
@@ -235,7 +278,7 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 	//times with strtotime($date . '+1 year ...'), so the solar calculations below
 	//must resolve their day the same way or they would sit on the wrong date --
 	//including through the leap-day handling at the bottom of this loop.
-	$event_date = date('Y-m-d', strtotime($date . '+1 year'));
+	$event_date = date('Y-m-d', strtotime($date . ' ' . $year_shift));
 
 	if ( isset($_GET['noon']) || isset($_GET['all']) ){
 		$noon_transit = solarTransit($event_date, $lat, $lng, $gmt);
@@ -278,7 +321,7 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 		}
 	}
 
-	$dst = ( date('I', strtotime($date . '+1 year +12 hours')) ) ? 1 : 0;
+	$dst = ( date('I', strtotime($date . ' ' . $year_shift . ' +12 hours')) ) ? 1 : 0;
 
 	$last_sync = ( $date == date('Y-m-d', strtotime('Today -1 Year')) && 1==2 ) ? ' [Last Sync]' : '';
 
@@ -333,14 +376,17 @@ DTSTART:<?php echo dateToCal($event['start']+$gmt_math) . "\r\n"; ?>
 DTEND:<?php echo dateToCal($event['end']+$gmt_math) . "\r\n"; ?>
 DTSTAMP:<?php echo dateToCal(time()) . "\r\n"; ?>
 LAST-MODIFIED:<?php echo dateToCal(filemtime(__FILE__)) . "\r\n"; ?>
-UID:<?php echo md5($date . '-' . $event_key . '@kythings.walkowiaks.com') . "\r\n"; /* Unique per event, per day. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" -- Google collapsed the whole feed to nothing. See the note above the foreach. */ ?>
+UID:<?php echo md5($event_date . '-' . $event_key . '@kythings.walkowiaks.com') . "\r\n"; /* Keyed on the event's OWN date, not the loop variable. Two reasons. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" and made Google render the feed empty. And keying on $event_date makes the UID identical whether the feed was generated in rolling or fixed-year mode, and stable as the rolling window slides -- otherwise every refetch would look like a fresh set of events and clients would churn. */ ?>
 DESCRIPTION:<?php echo escapeString($event['name'] . ' - an Anamanta solar time.') . "\r\n"; /* Deliberately short. RFC 5545 folds content lines at 75 octets, and the longest event name here is "Astronomical Twilight", so this stays inside the limit without needing a folding routine. */ ?>
 URL;VALUE=URI:<?php echo escapeString('https://kythings.walkowiaks.com/') . "\r\n"; ?>
 SUMMARY:<?php echo escapeString($event['name'] . $last_sync) . "\r\n"; //Shows up in the title of the event ?>
 END:VEVENT<?php echo "\r\n"; ?>
 <?php endforeach; ?>
 <?php
-	if ( $date == $year-1 . '-02-28' && date('L', strtotime($year . '-02-29')) ){ //If is Feb 28th and if tomorrow is a leap day
+	if ( $rolling ){
+		//$date is the event's own date here, so a leap day is just another day.
+		$date = date("Y-m-d", strtotime("+1 day", strtotime($date)));
+	} elseif ( $date == $year-1 . '-02-28' && date('L', strtotime($year . '-02-29')) ){ //If is Feb 28th and if tomorrow is a leap day
 		$date = date("Y-m-d", strtotime($year . '-02-29')); //Set the year to the current year (rather than the previous year)
 	} elseif ( $date == $year . '-02-29' ){ //If this *is* leap day
 		$date = date("Y-m-d", strtotime($year-1 . '-03-01')); //Set the year back to the previous year on March 1

@@ -48,8 +48,27 @@ If you would rather build the URL yourself, `sun.php` takes these query paramete
 | `lat` | Latitude, decimal degrees | `43.0469` |
 | `lng` | Longitude, decimal degrees | `-76.1444` |
 | `gmt` | UTC offset, **whole hours only** | `-5` |
-| `year` | Calendar year to generate | current year |
 | `length` | Event duration in minutes | `15` |
+| `months` | How far ahead the rolling window reaches, 1–36 | `18` |
+| `back` | Days of history kept in the window, 0–365 | `30` |
+| `year` | Generate one fixed calendar year instead of a rolling window | — |
+
+### The window rolls; it does not stop at New Year
+
+By default the feed covers roughly **a month behind to 18 months ahead of today**, recalculated on every request, so
+the window slides forward each time a calendar app refreshes. On 31 December you can already see January.
+
+That matters more than it sounds. A feed pinned to one calendar year dies at midnight on 31 December and does not
+recover until the client next refetches — which, for Google, can be up to 24 hours into the new year, exactly when
+somebody wants to look ahead.
+
+Event UIDs are derived from the event's own date, so a given day keeps the same UID as the window slides. Calendar
+clients update in place rather than churning the whole feed on every refresh.
+
+Passing `?year=NNNN` selects that single calendar year instead, with byte-identical output to upstream. Note that
+in fixed-year mode upstream computes each sunrise and sunset from the *previous* year's date and relabels it, so a
+few dozen events differ by up to a minute from the rolling window, which uses the correct date. Rolling mode is the
+more accurate of the two; fixed-year mode is kept unchanged for compatibility.
 
 Event types are flags — their presence is what counts, so `?noon` and `?noon=1` behave identically:
 
