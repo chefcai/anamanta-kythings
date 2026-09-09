@@ -45,3 +45,19 @@ Your mileage may vary if only passing GMT offset:
 Calendar software caches remote .ics files (like this one), so when replacing it you can "bust" the cache by adding another query parameter of random characters such as `&sdfgsfd`.
 
 - [More information available at Gearside.com](https://gearside.com/google-daylight-calendar/)
+
+## About this fork
+
+This is a fork of [chrisblakley/Daylight-Calendar-ICS](https://github.com/chrisblakley/Daylight-Calendar-ICS)
+by Chris Blakley / Gearside, which is the origin of `sun.php`, `daylight.php` and `nighttime.php` and of the
+sunrise/sunset and twilight calculations. All credit for the original work is his.
+
+This fork adds, for self-hosting at `kythings.walkowiaks.com`:
+
+- `noon` and `midnight` event types, using `date_sun_info()` transit rather than clock noon
+- `index.php`, a subscription URL builder
+- a container image and a CI/publish pipeline
+
+It also changes the calendar's identity to "Anamanta Kythings", gives every event a unique UID and drops the
+per-event yearly `RRULE`. The last two were necessary: sharing one UID across every event on a date, plus a
+recurrence rule, made Google Calendar render the subscription empty.

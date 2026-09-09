@@ -22,12 +22,36 @@ OUT=/tmp/regression
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 normalise() {
-	# Deprecation notices name the file they came from, so upstream and modified
-	# can never match textually. They are dropped here only so the diff compares
-	# calendar content. They are NOT harmless - see tests/deprecations.sh, which
-	# checks them deliberately.
+	# What this diff still guarantees, and what it deliberately ignores.
+	#
+	# The point of this check is that every pre-existing event lands at the same
+	# INSTANT as upstream put it. DTSTART, DTEND and SUMMARY are compared
+	# verbatim and a one-second shift still fails the build.
+	#
+	# Normalised away:
+	#   DTSTAMP / LAST-MODIFIED  - nondeterministic, and differ because upstream
+	#                              and modified are two different files.
+	#   Deprecation notices      - name their source file, so can never match.
+	#                              Checked separately, they are not harmless.
+	#   UID                      - deliberately changed. Upstream reused one UID
+	#                              for every event on a date, which RFC 5545
+	#                              reads as one event redefined several times,
+	#                              and Google rendered the feed empty.
+	#   RRULE                    - deliberately removed. Upstream repeated every
+	#                              event yearly for three years, which states
+	#                              wrong solar times for the two following years.
+	#   PRODID / X-WR-* /
+	#   DESCRIPTION / URL        - deliberately rebranded to Anamanta Kythings.
 	sed -e 's/^DTSTAMP:.*/DTSTAMP:<normalised>/' \
 	    -e 's/^LAST-MODIFIED:.*/LAST-MODIFIED:<normalised>/' \
+	    -e 's/^UID:.*/UID:<normalised>/' \
+	    -e 's/^PRODID:.*/PRODID:<normalised>/' \
+	    -e 's/^DESCRIPTION:.*/DESCRIPTION:<normalised>/' \
+	    -e 's|^URL;VALUE=URI:.*|URL;VALUE=URI:<normalised>|' \
+	    -e '/^RRULE:/d' \
+	    -e '/^X-WR-/d' \
+	    -e '/^X-PUBLISHED-TTL:/d' \
+	    -e '/^REFRESH-INTERVAL/d' \
 	    -e '/^Deprecated: Function date_sun\(rise\|set\)() is deprecated in /d'
 }
 

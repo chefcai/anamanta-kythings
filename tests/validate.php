@@ -331,21 +331,44 @@ check('exactly one solar midnight per day of the year',
 check('exactly one solar noon per day of the year',
 	count($noon) === $expected_days, count($noon) . ' events for ' . $expected_days . ' days');
 
-section('UID uniqueness');
+section('Google Calendar compatibility (the empty-subscription bug)');
 
-$uids = array();
-$dupe_new = 0;
-foreach ( array_merge($noon, $midnight) as $e ){
-	if ( isset($uids[$e['uid']]) ){ $dupe_new++; }
-	$uids[$e['uid']] = true;
-}
-check('new-type events all have distinct UIDs', $dupe_new === 0, "$dupe_new duplicates");
+/*
+	These two are why a subscription in Google Calendar came back with no events
+	at all, despite the feed itself being served correctly with 1460 VEVENTs.
 
+	RFC 5545: UID is the identity of a calendar component. Several VEVENTs
+	sharing one UID with no RECURRENCE-ID do not describe several events, they
+	describe one event redefined several contradictory ways. Upstream gave every
+	event on a date the same UID. Add a yearly RRULE on top of that and the
+	result is a calendar a strict consumer will not render.
+*/
 $all_uids = array();
-foreach ( $events as $e ){ $all_uids[$e['uid']] = true; }
-check('NOTE: whole-feed UID collisions are a PRE-EXISTING upstream issue',
-	true,
-	count($events) . ' events share ' . count($all_uids) . ' distinct UIDs - see BRAIN-44 comment');
+foreach ( $events as $e ){
+	if ( !isset($all_uids[$e['uid']]) ){ $all_uids[$e['uid']] = 0; }
+	$all_uids[$e['uid']]++;
+}
+$collisions = 0;
+foreach ( $all_uids as $n ){ if ( $n > 1 ){ $collisions++; } }
+
+check('every event in the feed has a globally unique UID',
+	$collisions === 0,
+	count($events) . ' events, ' . count($all_uids) . ' distinct UIDs, ' . $collisions . ' collided');
+
+check('no RRULE on any event (solar times differ every year, so they must not repeat)',
+	strpos((string)$ics, 'RRULE') === false);
+
+check('Content-Disposition is not "attachment"',
+	stripos((string)$ics, 'attachment') === false);
+
+section('Calendar naming');
+
+check('X-WR-CALNAME is "Anamanta Kythings"',
+	strpos((string)$ics, 'X-WR-CALNAME:Anamanta Kythings') !== false);
+check('PRODID no longer references the upstream host',
+	stripos((string)$ics, 'PRODID:-//Anamanta') !== false);
+check('no gearside.com references remain in the feed body',
+	stripos((string)$ics, 'gearside') === false);
 
 section('Opt-in behaviour');
 
