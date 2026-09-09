@@ -23,19 +23,49 @@ const GEOCODER_TIMEOUT  = 6;
 
 $submitted = isset($_GET['build']);
 
-$in_place    = isset($_GET['place'])    ? trim((string)$_GET['place'])    : '';
-$in_lat      = isset($_GET['lat'])      ? trim((string)$_GET['lat'])      : '';
-$in_lng      = isset($_GET['lng'])      ? trim((string)$_GET['lng'])      : '';
-$in_tz       = isset($_GET['tz'])       ? trim((string)$_GET['tz'])       : '';
-$in_length   = isset($_GET['length'])   ? trim((string)$_GET['length'])   : '5';
+/*
+	Real defaults, not placeholder text.
 
-// All four ticked by default - these are the four core Anamanta times. On a
-// submitted form we read what was actually ticked instead.
+	These are rendered into value="" so the form arrives pre-filled and a bare
+	submit produces a working feed. Placeholder attributes are only a greyed-out
+	hint - they look like content but submit as empty, which is why hitting
+	Build without typing anything used to fail.
+*/
+const DEFAULT_PLACE  = 'Worthington, MA';
+const DEFAULT_TZ     = 'America/New_York';
+const DEFAULT_LENGTH = '5';
+
+// On a submitted form take exactly what was sent, so a field the user cleared
+// on purpose stays cleared. Only a first visit gets the defaults.
+$in_place  = $submitted ? trim((string)($_GET['place']  ?? '')) : DEFAULT_PLACE;
+$in_lat    = $submitted ? trim((string)($_GET['lat']    ?? '')) : '';
+$in_lng    = $submitted ? trim((string)($_GET['lng']    ?? '')) : '';
+$in_tz     = $submitted ? trim((string)($_GET['tz']     ?? '')) : DEFAULT_TZ;
+$in_length = $submitted ? trim((string)($_GET['length'] ?? '')) : DEFAULT_LENGTH;
+
+// A bare submit with nothing filled in should still work rather than scold.
+if ( $submitted ){
+	if ( $in_place === '' && $in_lat === '' && $in_lng === '' ){ $in_place  = DEFAULT_PLACE; }
+	if ( $in_tz === '' )                                       { $in_tz     = DEFAULT_TZ; }
+	if ( $in_length === '' )                                   { $in_length = DEFAULT_LENGTH; }
+}
+
+/*
+	All four ticked by default - these are the four core Anamanta times.
+
+	Unchecked boxes send nothing at all, so "no t_* parameters" is ambiguous: it
+	means either "the user unticked everything" or "this request did not come
+	from the form". The form always sends a hidden `form=1`, which tells the two
+	apart. Without it we are looking at a hand-typed or bare URL, and defaults
+	apply.
+*/
+$from_form = isset($_GET['form']);
+
 $want = array(
-	'sunrise'  => $submitted ? isset($_GET['t_sunrise'])  : true,
-	'noon'     => $submitted ? isset($_GET['t_noon'])     : true,
-	'sunset'   => $submitted ? isset($_GET['t_sunset'])   : true,
-	'midnight' => $submitted ? isset($_GET['t_midnight']) : true,
+	'sunrise'  => ( $submitted && $from_form ) ? isset($_GET['t_sunrise'])  : true,
+	'noon'     => ( $submitted && $from_form ) ? isset($_GET['t_noon'])     : true,
+	'sunset'   => ( $submitted && $from_form ) ? isset($_GET['t_sunset'])   : true,
+	'midnight' => ( $submitted && $from_form ) ? isset($_GET['t_midnight']) : true,
 );
 
 $errors  = array();
@@ -168,12 +198,7 @@ if ( $submitted ){
 		$errors[] = 'Event length must be between 1 and 1440 minutes.';
 	}
 
-	$tzname = $in_tz;
-	if ( $tzname === '' ){
-		$tzname = 'UTC';
-		$notes[] = 'No timezone given, so UTC was assumed. This does not change the times you see - '
-		         . 'your calendar app converts them to your own timezone either way.';
-	}
+	$tzname = ( $in_tz === '' ) ? DEFAULT_TZ : $in_tz;
 	if ( !in_array($tzname, timezone_identifiers_list(), true) ){
 		$errors[] = 'Unrecognised timezone name. Pick one from the list, for example America/Los_Angeles.';
 		$tzname = null;
@@ -211,8 +236,22 @@ if ( $submitted ){
 		if ( $want['noon'] ){     $query .= '&noon'; }
 		if ( $want['midnight'] ){ $query .= '&midnight'; }
 
-		$feed_url   = $BASE_URL . '/sun.php?' . $query;
-		$google_url = 'https://calendar.google.com/calendar/render?cid=' . rawurlencode($feed_url);
+		$feed_url = $BASE_URL . '/sun.php?' . $query;
+
+		/*
+			Deliberately NOT a calendar.google.com/render?cid=... link.
+
+			That trick is widely copied but no longer works reliably for an
+			arbitrary ICS URL - `cid` really wants a Google calendar ID, and
+			every variant tested (render / r / u/0/r, with the URL as https or
+			webcal, encoded or not) just lands on Google Calendar without
+			subscribing to anything. A button that looks like it worked and
+			silently did nothing is worse than no button, so this links straight
+			to Google's own "add by URL" screen and the user pastes one line.
+		*/
+		$google_url = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl';
+
+		// webcal:// does work: macOS and iOS hand it straight to Calendar.
 		$webcal_url = preg_replace('#^https?://#', 'webcal://', $feed_url);
 
 		$result = array(
@@ -288,6 +327,7 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 
 <form method="get" action="">
 <input type="hidden" name="build" value="1">
+<input type="hidden" name="form" value="1">
 
 <fieldset>
 	<legend>Where you are</legend>
@@ -361,34 +401,35 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</p>
 	<p class="meta"><em>If that is not the right place, adjust the form above or enter coordinates directly.</em></p>
 
-	<h3>One-click for Google Calendar</h3>
-	<p><a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Subscribe in Google Calendar</a></p>
-
-	<h3>Apple Calendar / Outlook</h3>
-	<p class="meta" style="margin:.2rem 0 .3rem;">Copy this address and add it as a subscribed calendar:</p>
-	<code class="url"><?php echo e($result['feed']); ?></code>
-
-	<p class="meta" style="margin:.2rem 0 .3rem;">On a Mac or iPhone this link usually opens Calendar directly:</p>
-	<code class="url"><?php echo e($result['webcal']); ?></code>
+	<h3>Your calendar address</h3>
+	<p class="meta" style="margin:.2rem 0 .3rem;">This one line is all you need. Copy it, then follow the steps below for your calendar app.</p>
+	<code class="url" id="feedurl"><?php echo e($result['feed']); ?></code>
+	<p><button type="button" class="btnlink" id="copybtn" style="border:0;cursor:pointer;">Copy address</button></p>
 </div>
 
 <h2>How to subscribe</h2>
 
 <h3>Google Calendar</h3>
 <ol>
-	<li>Use the button above, or go to Settings &rarr; Add calendar &rarr; <em>From URL</em>.</li>
-	<li>Paste the address and click <em>Add calendar</em>.</li>
+	<li>Open <a href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Google Calendar &rarr; Add calendar &rarr; From URL</a>.</li>
+	<li>Paste the address above into <em>URL of calendar</em>.</li>
+	<li>Click <em>Add calendar</em>.</li>
 </ol>
+<p class="meta">There is no working one-click link for this. Google's <code>?cid=</code> shortcut is widely
+	repeated online but no longer subscribes to an outside calendar address &mdash; it just opens Google Calendar and
+	quietly does nothing. The link above goes straight to the right settings screen instead, so it is one paste.</p>
 
 <h3>Apple Calendar</h3>
 <ol>
-	<li>Mac: File &rarr; New Calendar Subscription, then paste the address.</li>
-	<li>iPhone or iPad: Settings &rarr; Apps &rarr; Calendar &rarr; Accounts &rarr; Add Account &rarr; Other &rarr; Add Subscribed Calendar.</li>
+	<li>Mac or iPhone: open this link and confirm &mdash;
+		<a href="<?php echo e($result['webcal']); ?>">subscribe in Apple Calendar</a>.</li>
+	<li>Or on a Mac: File &rarr; New Calendar Subscription, then paste the address.</li>
+	<li>Or on iPhone or iPad: Settings &rarr; Apps &rarr; Calendar &rarr; Accounts &rarr; Add Account &rarr; Other &rarr; Add Subscribed Calendar.</li>
 </ol>
 
 <h3>Outlook</h3>
 <ol>
-	<li>Go to Add calendar &rarr; Subscribe from web, paste the address and give it a name.</li>
+	<li>Add calendar &rarr; Subscribe from web, paste the address and give it a name.</li>
 </ol>
 
 <h2>Two things worth knowing</h2>
@@ -401,6 +442,22 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 		do this once.</li>
 </ul>
 
+<script>
+(function () {
+	var btn = document.getElementById('copybtn');
+	var src = document.getElementById('feedurl');
+	if ( !btn || !src ) { return; }
+	btn.addEventListener('click', function () {
+		var text = src.textContent.trim();
+		var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy address'; }, 2000); };
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			navigator.clipboard.writeText(text).then(done, function () { window.prompt('Copy this address:', text); });
+		} else {
+			window.prompt('Copy this address:', text);
+		}
+	});
+})();
+</script>
 <?php endif; ?>
 
 </div>

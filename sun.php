@@ -13,7 +13,9 @@ $debug = 0; //Enable forced debug mode here
 
 if ( $debug == 0 && !array_key_exists('debug', $_GET) ){
 	header('Content-type: text/calendar; charset=utf-8');
-	header('Content-Disposition: attachment; filename=gearside_daylight.ics');
+	// `inline`, not `attachment`. This is a subscription feed that calendar
+	// clients poll, not a file a browser should download and save.
+	header('Content-Disposition: inline; filename=anamanta-kythings.ics');
 } else {
 	error_reporting(E_ALL); // Report all errors
 	ini_set('display_errors', 1); // Display errors on the screen
@@ -115,10 +117,13 @@ if ( $syracuse ){
 ?>
 BEGIN:VCALENDAR<?php echo "\r\n"; ?>
 VERSION:2.0<?php echo "\r\n"; ?>
-PRODID:-//hacksw/handcal//NONSGML v1.0//EN<?php echo "\r\n"; //Could this be updated to Gearside? PRODID:-//Gearside Creative//Daylight//EN ?>
+PRODID:-//Anamanta//Kythings Solar Calendar//EN<?php echo "\r\n"; ?>
 CALSCALE:GREGORIAN<?php echo "\r\n"; ?>
 METHOD:PUBLISH<?php echo "\r\n"; ?>
-X-WR-CALNAME:Gearside - Daylight<?php echo "\r\n"; ?>
+X-WR-CALNAME:Anamanta Kythings<?php echo "\r\n"; ?>
+X-WR-CALDESC:Daily solar times - sunrise\, solar noon\, sunset and solar midnight.<?php echo "\r\n"; ?>
+X-PUBLISHED-TTL:PT12H<?php echo "\r\n"; ?>
+REFRESH-INTERVAL;VALUE=DURATION:PT12H<?php echo "\r\n"; ?>
 <?php
 $date = $year-1 . '-01-01'; //Subtract one year so it can carry over at the end of the year/beginning of the year (this messes up leap years, so refer to conditional at the very bottom).
 while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) == strtotime($year . '-02-29') ): //The or statement is just for leap days
@@ -239,7 +244,6 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 			$events['solar noon']['start'] = utcToEventStart($noon_transit, $gmt);
 			$events['solar noon']['length'] = $length*60; //Minutes in seconds, same as sunrise/sunset (Default: 15 minutes)
 			$events['solar noon']['end'] = $events['solar noon']['start']+$events['solar noon']['length'];
-			$events['solar noon']['uid'] = md5($date . '-solar-noon@gearside.com');
 		}
 	}
 
@@ -271,7 +275,6 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 			$events['solar midnight']['start'] = utcToEventStart($midnight_utc, $gmt);
 			$events['solar midnight']['length'] = $length*60; //Minutes in seconds, same as sunrise/sunset (Default: 15 minutes)
 			$events['solar midnight']['end'] = $events['solar midnight']['start']+$events['solar midnight']['length'];
-			$events['solar midnight']['uid'] = md5($date . '-solar-midnight@gearside.com');
 		}
 	}
 
@@ -299,7 +302,26 @@ while ( strtotime($date) <= strtotime($year-1 . '-12-31') || strtotime($date) ==
 		echo "\r\n";
 	}
 ?>
-<?php foreach( $events as $event ): //Need to make 6 events per day ?>
+<?php
+/*
+	Two upstream behaviours were removed here, both of which broke subscription
+	in Google Calendar. They are deliberate changes, not accidents:
+
+	1. UID was md5($date . "@gearside.com") -- identical for every event on a
+	   given date. RFC 5545 treats UID as the identity of a calendar component,
+	   so several VEVENTs sharing one UID without a RECURRENCE-ID are not
+	   separate events, they are contradictory redefinitions of one event.
+	   Subscribing produced an empty calendar. UID is now unique per event per
+	   day, keyed on the event type.
+
+	2. RRULE:FREQ=YEARLY;COUNT=3 was emitted on every event, repeating each
+	   day's times in the two following years. That is wrong for a solar
+	   calendar -- sunrise on 3 March 2027 is not at 2026's time -- and layering
+	   a recurrence rule on top of already-duplicated UIDs is what made the feed
+	   unparseable. The feed now states each day once, for the requested year.
+*/
+?>
+<?php foreach( $events as $event_key => $event ): ?>
 <?php
 	if ( $event['start'] === 0 ){
 		continue; //Skip any events that do not have data
@@ -311,11 +333,10 @@ DTSTART:<?php echo dateToCal($event['start']+$gmt_math) . "\r\n"; ?>
 DTEND:<?php echo dateToCal($event['end']+$gmt_math) . "\r\n"; ?>
 DTSTAMP:<?php echo dateToCal(time()) . "\r\n"; ?>
 LAST-MODIFIED:<?php echo dateToCal(filemtime(__FILE__)) . "\r\n"; ?>
-UID:<?php echo ( isset($event['uid']) ? $event['uid'] : md5($date . "@gearside.com") ) . "\r\n"; //Pre-existing events keep the original per-date UID untouched; new event types supply their own so they do not collide ?>
-DESCRIPTION:<?php echo escapeString('Sun calendar by Gearside.com') . "\r\n"; //This is for additional information ?>
-URL;VALUE=URI:<?php echo escapeString('http://gearside.com/calendars/sun.ics') . "\r\n"; ?>
+UID:<?php echo md5($date . '-' . $event_key . '@kythings.walkowiaks.com') . "\r\n"; /* Unique per event, per day. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" -- Google collapsed the whole feed to nothing. See the note above the foreach. */ ?>
+DESCRIPTION:<?php echo escapeString($event['name'] . ' at this location. One of the four Anamanta solar times.') . "\r\n"; ?>
+URL;VALUE=URI:<?php echo escapeString('https://kythings.walkowiaks.com/') . "\r\n"; ?>
 SUMMARY:<?php echo escapeString($event['name'] . $last_sync) . "\r\n"; //Shows up in the title of the event ?>
-RRULE:FREQ=YEARLY;COUNT=3<?php echo "\r\n"; ?>
 END:VEVENT<?php echo "\r\n"; ?>
 <?php endforeach; ?>
 <?php
