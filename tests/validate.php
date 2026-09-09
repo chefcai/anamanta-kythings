@@ -381,6 +381,76 @@ check('PRODID no longer references the upstream host',
 check('no gearside.com references remain in the feed body',
 	stripos((string)$ics, 'gearside') === false);
 
+section('Rolling window (year-boundary defect)');
+
+/*
+	A feed pinned to one calendar year dies every 31 December, and only recovers
+	whenever the client next refetches - up to 24 hours into January. The default
+	is now a window relative to today, so it never runs out.
+
+	The property that matters most is UID stability: as the window slides forward
+	on each fetch, an event for a given day must keep the same UID, or clients
+	will treat every refresh as a fresh set of events and churn.
+*/
+$roll_qs = "lat=$LAT&lng=$LNG&gmt=$GMT&length=$LEN&actual&noon&midnight";
+$roll    = parseEvents(generate($roll_qs));
+
+check('default (no year param) produces a rolling window, not a single year',
+	count($roll) > 1460, count($roll) . ' events');
+
+$roll_starts = array_map(function($e){ return $e['start']; }, $roll);
+sort($roll_starts);
+$first = $roll_starts[0];
+$last  = $roll_starts[count($roll_starts)-1];
+
+check('window starts in the recent past, not on 1 January',
+	$first < time() && $first > strtotime('-70 days'),
+	'first event ' . utc($first));
+check('window reaches at least 12 months ahead',
+	$last > strtotime('+12 months'),
+	'last event ' . utc($last));
+check('window crosses at least one 31 Dec -> 1 Jan boundary',
+	(int) gmdate('Y', $last) > (int) gmdate('Y', $first),
+	utc($first, 'Y') . ' -> ' . utc($last, 'Y'));
+
+// The heart of it: two different windows must agree on every day they share.
+$narrow = parseEvents(generate($roll_qs . '&back=5&months=6'));
+$by_uid = array();
+foreach ( $roll as $e ){ $by_uid[$e['uid']] = $e; }
+$shared = 0; $moved = 0;
+foreach ( $narrow as $e ){
+	if ( isset($by_uid[$e['uid']]) ){
+		$shared++;
+		if ( $by_uid[$e['uid']]['start'] !== $e['start'] || $by_uid[$e['uid']]['summary'] !== $e['summary'] ){ $moved++; }
+	}
+}
+check('UIDs are stable across window sizes - no event moves when the window slides',
+	$moved === 0 && $shared > 500,
+	"$shared shared events, $moved moved");
+
+$roll_uids = array();
+foreach ( $roll as $e ){ $roll_uids[$e['uid']] = true; }
+check('rolling feed has no duplicate UIDs',
+	count($roll_uids) === count($roll),
+	count($roll) . ' events, ' . count($roll_uids) . ' distinct');
+
+check('rolling feed still contains all four event types',
+	count(byType($roll,'Sunrise')) > 500 && count(byType($roll,'Sunset')) > 500
+	&& count(byType($roll,'Solar Noon')) > 500 && count(byType($roll,'Solar Midnight')) > 500);
+
+// Legacy mode must be untouched - tests/regression.sh proves byte-identity, this
+// just guards the switch itself.
+$fixed = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=2026&length=$LEN&actual&noon&midnight"));
+check('?year=NNNN still returns exactly that one year',
+	count($fixed) === 1460, count($fixed) . ' events');
+$fx = array_map(function($e){ return $e['start']; }, $fixed);
+check('?year=2026 events all fall in 2026 local time',
+	gmdate('Y', min($fx) + $GMT*3600) === '2026' && gmdate('Y', max($fx) + $GMT*3600) === '2026');
+
+check('months and back params are clamped to sane bounds',
+	count(parseEvents(generate($roll_qs . '&months=999&back=-5'))) < 4600,
+	'unbounded months would blow up the response');
+
 section('Opt-in behaviour');
 
 $plain = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&actual"));

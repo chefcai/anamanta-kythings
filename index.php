@@ -266,10 +266,25 @@ if ( $submitted ){
 		// Documented fallback if render misbehaves for a given account.
 		$google_alt = 'https://calendar.google.com/calendar/u/0/r/settings/addcalendar?cid=' . rawurlencode($webcal_url);
 
+		/*
+			Outlook on the web. Same encoding rules as Google - the feed URL is a
+			value inside another query string, so it is encoded once.
+
+			Unlike the Google link, this one is NOT verified working. Outlook
+			returns HTTP 417 to any unauthenticated request, including to paths
+			that certainly exist, so probing it from outside a signed-in session
+			proves nothing either way. The URL form is Microsoft's documented one
+			and the button is offered on that basis, with the manual address kept
+			directly underneath so a failure costs the user one paste.
+		*/
+		$outlook_url = 'https://outlook.live.com/calendar/0/addfromweb?url=' . rawurlencode($webcal_url)
+		             . '&name=' . rawurlencode('Anamanta Kythings');
+
 		$result = array(
 			'feed'    => $feed_url,
 			'google'  => $google_url,
 			'googlealt' => $google_alt,
+			'outlook' => $outlook_url,
 			'webcal'  => $webcal_url,
 			'tz'     => $tzname,
 			'gmt'    => $gmt,
@@ -315,6 +330,8 @@ $tz_list = timezone_identifiers_list();
 	.err { background:#fdecea; border:1px solid #e5b3ad; }
 	.note { background:var(--warm); border:1px solid var(--line); }
 	.warn { background:#fff6e0; border:1px solid #e0c98a; border-radius:6px; padding:.7rem .9rem; font-size:.92rem; margin:.2rem 0 .9rem; }
+	.btnrow { display:flex; flex-wrap:wrap; gap:.6rem; margin:.2rem 0 .8rem; }
+	.btnrow .btnlink { flex:1 1 auto; text-align:center; white-space:nowrap; }
 	.out { background:#fff; border:1px solid var(--line); border-radius:8px; padding:1.1rem; }
 	code, .url { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; }
 	.url { display:block; width:100%; word-break:break-all; background:var(--warm); border:1px solid var(--line);
@@ -415,15 +432,24 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</p>
 	<p class="meta"><em>If that is not the right place, adjust the form above or enter coordinates directly.</em></p>
 
-	<h3 style="margin-top:0;">Subscribe in Google Calendar</h3>
-	<p class="warn"><strong>Use a computer, not your phone.</strong> Google does not allow subscribing to an outside
-		calendar from the Google Calendar app on Android, iPhone or iPad &mdash; that is Google's own limitation, not
-		something this page can work around. Tapping the button on a phone will just open Google Calendar and appear to
-		do nothing. Do it once on a desktop browser and it will then sync to all your devices.</p>
-	<p><a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Subscribe in Google Calendar</a></p>
-	<p class="meta">You will get an <em>Add calendar</em> confirmation showing the address. Click <em>Add</em>.
-		If nothing happens, try the <a href="<?php echo e($result['googlealt']); ?>" target="_blank" rel="noopener noreferrer">alternate
-		link</a>, or add it by hand using the address below.</p>
+	<h3 style="margin-top:0;">Subscribe</h3>
+	<p class="warn"><strong>On mobile?</strong> Open this page on a computer to subscribe &mdash; it will then show up
+		automatically on your phone. Google and Outlook do not allow adding an outside calendar from their phone apps.
+		Apple Calendar is the exception: the Apple button below does work directly on an iPhone or iPad.</p>
+
+	<p class="btnrow">
+		<a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
+		<a class="btnlink" href="<?php echo e($result['webcal']); ?>">Add to Apple Calendar</a>
+		<a class="btnlink" href="<?php echo e($result['outlook']); ?>" target="_blank" rel="noopener noreferrer">Add to Outlook</a>
+	</p>
+
+	<p class="meta">
+		<strong>Google</strong> shows an <em>Add calendar</em> confirmation with the address &mdash; click <em>Add</em>.
+		If nothing happens, try the <a href="<?php echo e($result['googlealt']); ?>" target="_blank" rel="noopener noreferrer">alternate link</a>.
+		<strong>Apple</strong> hands off to the Calendar app and asks you to confirm.
+		<strong>Outlook</strong> opens Outlook on the web with the address pre-filled.
+		If any button does not do what you expect, use the address below &mdash; it works everywhere and takes one paste.
+	</p>
 
 	<h3>Your calendar address</h3>
 	<p class="meta" style="margin:.2rem 0 .3rem;">For any other app, or to add it to Google by hand.</p>
@@ -452,6 +478,11 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 <ol>
 	<li>Add calendar &rarr; Subscribe from web, paste the address and give it a name.</li>
 </ol>
+
+<h2>How far ahead it goes</h2>
+<p>The calendar covers about <strong>18 months ahead</strong> and a month behind, and that window moves forward
+	every time your calendar app refreshes it. It does not stop at the end of the year &mdash; on 31 December you can
+	already see January, and you never need to re-subscribe.</p>
 
 <h2>Two things worth knowing</h2>
 <ul>
