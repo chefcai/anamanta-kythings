@@ -39,6 +39,38 @@ All notable changes to this project are documented here.
   that case. Verified locally against all three cases (`http`, `https`, and
   no header) before this went anywhere near the live site.
 
+### Accessibility
+
+- Added a keyboard-focusable "Skip to main content" link as the first
+  focusable element on the page, and wrapped the page's content in a
+  `<main id="main">` landmark for it to target. The page had no nav or
+  header to bypass, but it also had zero landmarks at all, so this fixes
+  both a WCAG 2.4.1 (Bypass Blocks) finding and the missing-landmark gap
+  in one change. Visually hidden off-screen until focused (`top:-40px`,
+  not `display:none`, so it stays in the accessibility tree and reachable
+  by keyboard).
+- All 5 `target="_blank"` links (the lat/long lookup, the php.net timezone
+  reference, and the Google/Outlook/alternate-Google subscribe links) now
+  carry a visible "&#8599;" icon plus screen-reader-only "(opens in new
+  tab)" text, addressing a WCAG 3.2.5 (Change on Request) finding that a
+  new tab opening unannounced is an unexpected context change. The icon is
+  `aria-hidden`; the notice text is real text in a visually-hidden
+  (`.sr-only`) span, not an `aria-label` override, so it is announced in
+  addition to the link's own text rather than replacing it.
+- Text inputs (`input[type=text]`, `input[type=number]`) now border in
+  `--dim` (`#5f6769`, ~5.8:1 against the white field background) instead
+  of `--line` (`#d8d4cc`, ~1.48:1), fixing a WCAG 1.4.11 (Non-text
+  Contrast) finding on form-control boundaries. Scoped to form controls
+  only — `--line` is unchanged everywhere else it's used (fieldset
+  outlines, `hr`, `.note`/`.url` boxes), since those are decorative
+  dividers, not UI-component boundaries the criterion applies to.
+- Known, deliberately out of scope: the native checkboxes under "What to
+  include" and the `<details><summary>` disclosure triangle both render
+  with the browser's own UI, which isn't reliably restylable with plain
+  CSS alone. A custom control would fix it but adds real complexity and
+  risk for a boundary most browsers already render with reasonable
+  contrast by default; left alone unless it's specifically flagged.
+
 ### Fixed
 
 - Timezone field on `index.php` appeared to offer only one option (the
