@@ -38,6 +38,25 @@ All notable changes to this project are documented here.
   alone rather than redirected, since there is nothing to redirect *to* in
   that case. Verified locally against all three cases (`http`, `https`, and
   no header) before this went anywhere near the live site.
+- Added `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin`
+  and a locked-down `Permissions-Policy` (denying camera, microphone,
+  geolocation and other features this page never uses). Deliberately did
+  NOT add `Cross-Origin-Embedder-Policy` — its `require-corp` mode would
+  block the cross-origin Google Fonts stylesheet/font files this page
+  depends on, for isolation this single-page tool has no actual need for.
+  Also deliberately did NOT add `X-XSS-Protection`, `Feature-Policy`,
+  `Expect-CT` or `Public-Key-Pins` — all four are deprecated, and
+  `Public-Key-Pins` specifically can lock out your own domain if
+  misconfigured, so a scan flagging them as "missing" is describing
+  correct behavior, not a gap. Asserted in CI on both a 200 and a real 404,
+  same convention as the other headers.
+- A scan flagged an "AI agent readiness" checklist (MCP/A2A discovery,
+  OAuth/OIDC metadata, DNS-AID records, WebMCP, an API catalog, a
+  sitemap) as all failing. None of it applies: this is a single form with
+  no API surface for an agent to call, not a service meant to be consumed
+  by one, and the sitemap check in particular runs directly against the
+  page's own `<meta name="robots" content="noindex, nofollow">`, which is
+  there on purpose. Not implemented, and not planned.
 
 ### Accessibility
 
@@ -89,6 +108,12 @@ All notable changes to this project are documented here.
   populated (all 419 zones from `timezone_identifiers_list()`). The field now
   clears on focus, so clicking it reveals the whole list, and restores the
   prior value on blur if nothing was chosen.
+- `favicon.ico` was 404ing — nothing was ever served there, and browsers
+  request it by default regardless of what `<link rel="icon">` a page
+  declares. Added an original sun glyph (a filled circle with eight rays,
+  in the site's existing `--accent` green) as both `favicon.ico` (multi-size,
+  16/32/48/64px) and `favicon.svg`, referenced from `index.php` and asserted
+  reachable in CI.
 
 ### Changed
 
