@@ -136,6 +136,14 @@ Both are asserted in CI rather than trusted.
 
 Set `KYTHINGS_BASE_URL` if you serve it somewhere other than `https://kythings.walkowiaks.com`.
 
+### Security headers
+
+The image sends `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security` and a `Content-Security-Policy`
+on every response, set in `docker/default.conf` — see that file for the reasoning behind each one. `script-src` is a
+strict `'self'`: the builder page's own JavaScript lives entirely in same-origin `app.js`, with no inline `<script>`
+anywhere. If you fork this further and add inline script or a new external resource, the CSP will block it until
+`docker/default.conf` is updated to match — that is the policy doing its job, not a bug.
+
 ---
 
 ## Development

@@ -59,7 +59,15 @@ RUN printf '%s\n' \
 # external calls at all. ca-certificates is needed for the HTTPS geocode.
 RUN apk add --no-cache ca-certificates && rm -rf /var/cache/apk/*
 
-COPY --chown=nobody:nobody sun.php index.php /var/www/html/
+COPY --chown=nobody:nobody sun.php index.php app.js /var/www/html/
+
+# Security response headers. The base image ships its own conf.d/default.conf
+# with no headers of this kind, so it is replaced wholesale rather than
+# patched -- see docker/default.conf for the diff against the base's version
+# and the reasoning behind each header. add_header is inherited into every
+# location block that does not declare its own (none currently do), so this
+# applies uniformly to sun.php, index.php and the static app.js.
+COPY docker/default.conf /etc/nginx/conf.d/default.conf
 
 USER nobody
 
