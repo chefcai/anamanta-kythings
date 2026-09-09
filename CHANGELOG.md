@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Timezone field on `index.php` appeared to offer only one option (the
+  pre-filled default) because browsers filter native `<datalist>` suggestions
+  against the field's current text — with a full IANA name already typed in,
+  only that exact entry matched. The datalist itself was always fully
+  populated (all 419 zones from `timezone_identifiers_list()`). The field now
+  clears on focus, so clicking it reveals the whole list, and restores the
+  prior value on blur if nothing was chosen.
+
 ### Changed
 
 - Restyled `index.php` to align its palette and heading typeface with

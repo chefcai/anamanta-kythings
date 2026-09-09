@@ -390,11 +390,15 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</details>
 
 	<label for="tz">Timezone <span class="hint">&mdash; IANA name, for example America/Los_Angeles</span></label>
-	<input type="text" id="tz" name="tz" list="tzlist" value="<?php echo e($in_tz); ?>" placeholder="America/Los_Angeles">
+	<input type="text" id="tz" name="tz" list="tzlist" value="<?php echo e($in_tz); ?>" placeholder="America/Los_Angeles"
+		autocomplete="off"
+		onfocus="this.dataset.prevTz = this.value; this.value = '';"
+		onblur="if ( this.value === '' ) { this.value = this.dataset.prevTz || ''; }">
 	<datalist id="tzlist">
 		<?php foreach ( $tz_list as $tz ): ?><option value="<?php echo e($tz); ?>"><?php endforeach; ?>
 	</datalist>
-	<p class="hint" style="margin:.35rem 0 0;">Full list at
+	<p class="hint" style="margin:.35rem 0 0;">Click the field to see the full list of <?php echo count($tz_list); ?> timezones,
+		or start typing to search it. Full list also at
 		<a href="https://www.php.net/manual/en/timezones.php" target="_blank" rel="noopener noreferrer">php.net/timezones</a>.
 		This only decides which day each event is filed under &mdash; your calendar app always shows the times in your own
 		timezone, and handles daylight saving for you.</p>
