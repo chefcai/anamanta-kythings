@@ -22,9 +22,14 @@ All notable changes to this project are documented here.
   change; same handlers, same guards, just not inline.
 - Both are asserted in CI, matching this project's existing convention of
   checking the actual served response rather than trusting a setting: the
-  smoke test now confirms every header survives on a 404, not just a 200
+  smoke test confirms every header survives on a real 404, not just a 200
   (an `add_header` without `always` disappears exactly there), and that
-  `script-src` stayed a strict `'self'`.
+  `script-src` stayed a strict `'self'`. The first version of this check used
+  an arbitrary unmatched path as its "404" and never actually got one —
+  `location / { try_files ... /index.php...; }` (inherited from the base
+  image) routes anything unmatched to a 200 from `index.php`; only a
+  nonexistent `.php` path hits the block that really 404s. Fixed the same day
+  it was caught.
 - HTTP visits are now 301'd to HTTPS. The container has no TLS of its own, so
   this reads `X-Forwarded-Proto` (set by Cloudflare Tunnel, and by most other
   TLS-terminating proxies, to the scheme the *visitor* used — not the scheme
