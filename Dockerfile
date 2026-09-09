@@ -1,4 +1,4 @@
-# Anamanta solar calendar - kythings.walkowiaks.com
+# Anamanta solar calendar feed
 #
 # Self-contained image: nginx + php-fpm with the application code baked in, so
 # `docker compose pull && docker compose up -d kythings` is the whole deployment.

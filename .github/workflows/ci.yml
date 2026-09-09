@@ -66,19 +66,22 @@ jobs:
           echo "baseline: $(wc -l < sun_upstream.php) lines"
 
       - name: Regression - output must stay byte-identical to upstream
+        # KYTHINGS_BASE_URL is now required by sun.php (no fallback default),
+        # so it has to be set here even though the value itself is asserted
+        # nowhere -- the URL property is stripped out by normalise() below.
         run: |
-          docker run --rm -v "$PWD":/app -w /app kythings:ci sh /app/tests/regression.sh
+          docker run --rm -e KYTHINGS_BASE_URL=https://example.com -v "$PWD":/app -w /app kythings:ci sh /app/tests/regression.sh
 
       - name: Acceptance - 46 checks including the three date scenarios
         run: |
-          docker run --rm -v "$PWD":/app -w /app kythings:ci php /app/tests/validate.php
+          docker run --rm -e KYTHINGS_BASE_URL=https://example.com -v "$PWD":/app -w /app kythings:ci php /app/tests/validate.php
 
       # Serve the image for real and check what actually comes down the wire.
       # The checks above run the code; this one proves the *served response* is
       # clean, which is the thing that would break a calendar subscription.
       - name: Smoke test the served response
         run: |
-          docker run -d --name kythings-smoke -p 8087:8080 kythings:ci
+          docker run -d --name kythings-smoke -e KYTHINGS_BASE_URL=https://example.com -p 8087:8080 kythings:ci
           for i in $(seq 1 30); do
             curl -fsS -o /dev/null "http://127.0.0.1:8087/index.php" && break || sleep 2
           done
