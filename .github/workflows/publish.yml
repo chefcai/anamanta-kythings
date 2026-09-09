@@ -19,7 +19,11 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/daylight-calendar-ics
+  # Kept as a literal rather than derived from the repository name, so renaming
+  # the repo cannot silently move the image path that squirttle's compose file
+  # pins. Changing this line is a deployment change: publish first, confirm the
+  # new path is pullable, and only then repoint the server.
+  IMAGE: ghcr.io/${{ github.repository_owner }}/anamanta-kythings
 
 jobs:
   publish:

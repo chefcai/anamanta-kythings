@@ -21,6 +21,12 @@ FROM trafex/php-nginx@sha256:8a82bac3c9c4853e4b0bd33edfbbb0f30d4b3546f177a359440
 
 USER root
 
+# Links the published GHCR package back to this repository, which is what makes
+# the package page show the source and inherit the repo's visibility.
+LABEL org.opencontainers.image.source="https://github.com/chefcai/anamanta-kythings" \
+      org.opencontainers.image.description="Anamanta Kythings - daily solar times as a subscribable calendar feed" \
+      org.opencontainers.image.licenses="GPL-2.0"
+
 # ---------------------------------------------------------------------------
 # PHP configuration.
 #
