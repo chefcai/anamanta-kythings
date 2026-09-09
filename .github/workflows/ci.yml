@@ -184,6 +184,34 @@ jobs:
 
           echo "all header checks passed"
 
+      - name: Assert HTTP-to-HTTPS redirect
+        # The container has no TLS of its own, so this only fires off
+        # X-Forwarded-Proto -- the header a TLS-terminating proxy in front of
+        # it (Cloudflare Tunnel in production) sets to the scheme the visitor
+        # actually used. All three cases matter: a proxied http visit must
+        # redirect, a proxied https visit must NOT be redirected again (that
+        # would be a loop in production), and a direct request with no such
+        # header must also pass through untouched.
+        run: |
+          CODE_HTTP=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: http' "http://127.0.0.1:8087/")
+          LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' -H 'X-Forwarded-Proto: http' "http://127.0.0.1:8087/")
+          echo "proxied http visit: $CODE_HTTP -> $LOCATION"
+          [ "$CODE_HTTP" = "301" ] || { echo "::error::proxied http visit was not redirected (got $CODE_HTTP)"; exit 1; }
+          case "$LOCATION" in
+            https://*) ;;
+            *) echo "::error::redirect target is not https: $LOCATION"; exit 1 ;;
+          esac
+
+          CODE_HTTPS=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' "http://127.0.0.1:8087/")
+          echo "proxied https visit: $CODE_HTTPS"
+          [ "$CODE_HTTPS" = "200" ] || { echo "::error::proxied https visit was redirected too (redirect loop risk) - got $CODE_HTTPS"; exit 1; }
+
+          CODE_DIRECT=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8087/")
+          echo "direct, unproxied visit: $CODE_DIRECT"
+          [ "$CODE_DIRECT" = "200" ] || { echo "::error::direct request with no X-Forwarded-Proto was redirected - it has nowhere real to go"; exit 1; }
+
+          echo "all redirect checks passed"
+
       - name: Container logs on failure
         if: failure()
         run: docker logs kythings-smoke || true

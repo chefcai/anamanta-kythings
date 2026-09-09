@@ -25,6 +25,14 @@ All notable changes to this project are documented here.
   smoke test now confirms every header survives on a 404, not just a 200
   (an `add_header` without `always` disappears exactly there), and that
   `script-src` stayed a strict `'self'`.
+- HTTP visits are now 301'd to HTTPS. The container has no TLS of its own, so
+  this reads `X-Forwarded-Proto` (set by Cloudflare Tunnel, and by most other
+  TLS-terminating proxies, to the scheme the *visitor* used — not the scheme
+  of the proxy's own hop to the container) and redirects only when it is
+  exactly `http`. No header at all — a direct, non-proxied request — is left
+  alone rather than redirected, since there is nothing to redirect *to* in
+  that case. Verified locally against all three cases (`http`, `https`, and
+  no header) before this went anywhere near the live site.
 
 ### Fixed
 

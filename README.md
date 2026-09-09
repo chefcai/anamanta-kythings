@@ -144,6 +144,13 @@ strict `'self'`: the builder page's own JavaScript lives entirely in same-origin
 anywhere. If you fork this further and add inline script or a new external resource, the CSP will block it until
 `docker/default.conf` is updated to match — that is the policy doing its job, not a bug.
 
+The container has no TLS of its own — it is always meant to sit behind something that terminates TLS for it (Cloudflare
+Tunnel in production). It redirects HTTP to HTTPS by checking `X-Forwarded-Proto`, which Cloudflare (and most other
+TLS-terminating reverse proxies) sets to the scheme the visitor actually used, not the scheme of the proxy's own hop to
+this container. If you front this with something that doesn't set that header, the redirect simply won't fire — set
+`Always Use HTTPS` (or equivalent) on your proxy as the primary fix, and treat this header check as the second layer,
+not the only one.
+
 ---
 
 ## Development
