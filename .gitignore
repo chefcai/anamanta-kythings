@@ -83,3 +83,8 @@ $RECYCLE.BIN/
 *.secret.php
 error_log
 /Nebula-Child/data/
+# regression baseline + generated test artefacts
+sun_upstream.php
+feed.ics
+page.html
+built.html
