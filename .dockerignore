@@ -1,0 +1,12 @@
+.git
+.github
+tests
+sun_upstream.php
+*.ics
+*.html
+!index.php
+README.md
+LICENSE
+daylight.php
+nighttime.php
+calendar.html

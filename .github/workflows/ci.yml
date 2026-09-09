@@ -1,0 +1,124 @@
+name: CI
+
+# Runs on every push and PR. Never publishes, never touches squirttle, uses no
+# secrets. `pull_request` (not pull_request_target) so a fork PR runs without
+# access to anything privileged.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint, regression and acceptance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out (with upstream history for the regression baseline)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Build the image
+        run: docker build -t kythings:ci .
+
+      # The runner's own PHP is irrelevant. Every check below runs inside the
+      # built image, so what is tested is the exact runtime that gets deployed --
+      # same PHP build, same timezone database, same php.ini.
+      - name: Record the runtime under test
+        run: |
+          docker run --rm kythings:ci php -r \
+            'printf("PHP %s | tz=%s | tzdb=%s | display_errors=%s\n",
+              PHP_VERSION, date_default_timezone_get(), timezone_version_get(),
+              var_export(ini_get("display_errors"), true));'
+
+      - name: Assert container timezone is UTC
+        # dateToCal() formats with date('Ymd\THis\Z') -- it renders in the
+        # server's default timezone but labels the result Z. A non-UTC container
+        # emits wrong timestamps that still look perfectly well-formed.
+        run: |
+          TZ_IN_IMAGE=$(docker run --rm kythings:ci php -r 'echo date_default_timezone_get();')
+          echo "container timezone: $TZ_IN_IMAGE"
+          [ "$TZ_IN_IMAGE" = "UTC" ] || { echo "::error::container timezone is $TZ_IN_IMAGE, expected UTC"; exit 1; }
+
+      - name: Assert display_errors is Off
+        # With it on, deprecation notices for date_sunrise()/date_sunset() land
+        # in the response body and corrupt the ICS.
+        run: |
+          DE=$(docker run --rm kythings:ci php -r 'echo ini_get("display_errors") ?: "0";')
+          echo "display_errors: '$DE'"
+          case "$DE" in ""|"0"|"Off"|"off") ;; *) echo "::error::display_errors is '$DE', expected Off"; exit 1 ;; esac
+
+      - name: Lint every PHP file
+        run: |
+          docker run --rm -v "$PWD":/src:ro kythings:ci sh -c '
+            set -e
+            for f in $(find /src -name "*.php" -not -path "*/.git/*"); do php -l "$f"; done'
+
+      - name: Prepare the upstream baseline
+        run: |
+          git remote add upstream https://github.com/chrisblakley/Daylight-Calendar-ICS.git || true
+          git fetch --depth=1 upstream master
+          git show upstream/master:sun.php > sun_upstream.php
+          echo "baseline: $(wc -l < sun_upstream.php) lines"
+
+      - name: Regression - output must stay byte-identical to upstream
+        run: |
+          docker run --rm -v "$PWD":/app -w /app kythings:ci sh /app/tests/regression.sh
+
+      - name: Acceptance - 46 checks including the three date scenarios
+        run: |
+          docker run --rm -v "$PWD":/app -w /app kythings:ci php /app/tests/validate.php
+
+      # Serve the image for real and check what actually comes down the wire.
+      # The checks above run the code; this one proves the *served response* is
+      # clean, which is the thing that would break a calendar subscription.
+      - name: Smoke test the served response
+        run: |
+          docker run -d --name kythings-smoke -p 8087:8080 kythings:ci
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null "http://127.0.0.1:8087/index.php" && break || sleep 2
+          done
+
+          echo "--- feed ---"
+          curl -fsS "http://127.0.0.1:8087/sun.php?lat=42.396&lng=-72.936&gmt=-5&year=2026&length=5&actual&noon&midnight" -o feed.ics
+          head -c 200 feed.ics; echo
+
+          grep -q '^BEGIN:VCALENDAR' feed.ics || { echo "::error::feed does not start with BEGIN:VCALENDAR"; exit 1; }
+          grep -q 'END:VCALENDAR'   feed.ics || { echo "::error::feed has no END:VCALENDAR"; exit 1; }
+          grep -q 'SUMMARY:Solar Noon'     feed.ics || { echo "::error::no Solar Noon events"; exit 1; }
+          grep -q 'SUMMARY:Solar Midnight' feed.ics || { echo "::error::no Solar Midnight events"; exit 1; }
+          grep -q 'SUMMARY:Sunrise'        feed.ics || { echo "::error::no Sunrise events"; exit 1; }
+          grep -q 'SUMMARY:Sunset'         feed.ics || { echo "::error::no Sunset events"; exit 1; }
+
+          # The one that matters most: no PHP diagnostics in the served body.
+          if grep -qiE '(Deprecated:|Warning:|Notice:|Fatal error|<br />)' feed.ics; then
+            echo "::error::PHP diagnostics leaked into the served feed"
+            grep -inE '(Deprecated:|Warning:|Notice:|Fatal error)' feed.ics | head
+            exit 1
+          fi
+
+          echo "--- builder page ---"
+          curl -fsS "http://127.0.0.1:8087/index.php" -o page.html
+          grep -q 'Anamanta Solar Calendar' page.html || { echo "::error::builder page did not render"; exit 1; }
+          if grep -qiE '(Deprecated:|Fatal error|Parse error)' page.html; then
+            echo "::error::PHP diagnostics leaked into the builder page"; exit 1
+          fi
+
+          echo "--- builder page, submitted with manual coordinates (no network needed) ---"
+          curl -fsS "http://127.0.0.1:8087/index.php?build=1&lat=42.396&lng=-72.936&tz=America/New_York&length=5&t_sunrise=1&t_noon=1&t_sunset=1&t_midnight=1" -o built.html
+          grep -q 'sun.php?' built.html || { echo "::error::builder page did not produce a feed URL"; exit 1; }
+          grep -q 'calendar.google.com' built.html || { echo "::error::no Google Calendar subscribe link"; exit 1; }
+
+          echo "all smoke checks passed"
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs kythings-smoke || true
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f kythings-smoke || true
