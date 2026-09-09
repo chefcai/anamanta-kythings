@@ -113,6 +113,24 @@ jobs:
           grep -q 'sun.php?' built.html || { echo "::error::builder page did not produce a feed URL"; exit 1; }
           grep -q 'calendar.google.com' built.html || { echo "::error::no Google Calendar subscribe link"; exit 1; }
 
+          # The Google cid link only works if the value is a webcal:// URL that
+          # has been percent-encoded exactly once. If the inner separators are
+          # left raw, Google's query parser truncates at the first & and the
+          # feed loses six of its seven parameters. Both halves asserted.
+          grep -q 'cid=webcal%3A%2F%2F' built.html \
+            || { echo "::error::Google cid is not a single-encoded webcal:// URL"; exit 1; }
+          grep -q 'cid=webcal%3A%2F%2F[^"]*%26midnight' built.html \
+            || { echo "::error::Google cid appears truncated - inner params not encoded through to the last one"; exit 1; }
+          if grep -oE 'cid=webcal%3A%2F%2F[^"]*' built.html | head -1 | grep -q '&amp;\|&[a-z]*='; then
+            echo "::error::Google cid contains a raw & - Google will truncate it there"; exit 1
+          fi
+
+          # Desktop-only caveat must stay on the page: subscribing to an external
+          # calendar is not possible in Google's mobile apps, and its absence is
+          # what made this look broken during testing.
+          grep -qi 'not your phone' built.html \
+            || { echo "::error::desktop-only note missing from the results panel"; exit 1; }
+
           echo "all smoke checks passed"
 
       - name: Container logs on failure

@@ -238,26 +238,39 @@ if ( $submitted ){
 
 		$feed_url = $BASE_URL . '/sun.php?' . $query;
 
-		/*
-			Deliberately NOT a calendar.google.com/render?cid=... link.
-
-			That trick is widely copied but no longer works reliably for an
-			arbitrary ICS URL - `cid` really wants a Google calendar ID, and
-			every variant tested (render / r / u/0/r, with the URL as https or
-			webcal, encoded or not) just lands on Google Calendar without
-			subscribing to anything. A button that looks like it worked and
-			silently did nothing is worse than no button, so this links straight
-			to Google's own "add by URL" screen and the user pastes one line.
-		*/
-		$google_url = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl';
-
-		// webcal:// does work: macOS and iOS hand it straight to Calendar.
+		// webcal:// - macOS and iOS hand this straight to Calendar.
 		$webcal_url = preg_replace('#^https?://#', 'webcal://', $feed_url);
 
+		/*
+			Google Calendar one-click subscribe. Verified working on desktop web,
+			signed in: Google shows an "Add calendar" confirmation carrying the
+			full untruncated feed URL.
+
+			Two things both have to be true or it fails, which is why this is
+			built here rather than hand-assembled:
+
+			1. The cid value must use the webcal:// scheme. Given https://,
+			   Google reads it as an account identifier instead of a feed.
+			2. The whole webcal:// string is percent-encoded exactly ONCE, so the
+			   inner & become %26 and ? becomes %3F. Without that, Google's outer
+			   query parser stops at the first raw &, and this feed has seven
+			   parameters - it would receive only "...sun.php?lat=42.395999".
+
+			Caveat that no amount of URL correctness fixes: subscribing to an
+			external calendar is desktop-web only. Google's own help states you
+			cannot do it in the Android or iOS app. On a phone this link just
+			opens Google Calendar. The page says so plainly next to the button.
+		*/
+		$google_url = 'https://calendar.google.com/calendar/render?cid=' . rawurlencode($webcal_url);
+
+		// Documented fallback if render misbehaves for a given account.
+		$google_alt = 'https://calendar.google.com/calendar/u/0/r/settings/addcalendar?cid=' . rawurlencode($webcal_url);
+
 		$result = array(
-			'feed'   => $feed_url,
-			'google' => $google_url,
-			'webcal' => $webcal_url,
+			'feed'    => $feed_url,
+			'google'  => $google_url,
+			'googlealt' => $google_alt,
+			'webcal'  => $webcal_url,
 			'tz'     => $tzname,
 			'gmt'    => $gmt,
 			'lat'    => $params['lat'],
@@ -301,6 +314,7 @@ $tz_list = timezone_identifiers_list();
 	.err, .note { border-radius:6px; padding:.7rem .9rem; margin:0 0 .9rem; font-size:.92rem; }
 	.err { background:#fdecea; border:1px solid #e5b3ad; }
 	.note { background:var(--warm); border:1px solid var(--line); }
+	.warn { background:#fff6e0; border:1px solid #e0c98a; border-radius:6px; padding:.7rem .9rem; font-size:.92rem; margin:.2rem 0 .9rem; }
 	.out { background:#fff; border:1px solid var(--line); border-radius:8px; padding:1.1rem; }
 	code, .url { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; }
 	.url { display:block; width:100%; word-break:break-all; background:var(--warm); border:1px solid var(--line);
@@ -401,23 +415,30 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	</p>
 	<p class="meta"><em>If that is not the right place, adjust the form above or enter coordinates directly.</em></p>
 
+	<h3 style="margin-top:0;">Subscribe in Google Calendar</h3>
+	<p class="warn"><strong>Use a computer, not your phone.</strong> Google does not allow subscribing to an outside
+		calendar from the Google Calendar app on Android, iPhone or iPad &mdash; that is Google's own limitation, not
+		something this page can work around. Tapping the button on a phone will just open Google Calendar and appear to
+		do nothing. Do it once on a desktop browser and it will then sync to all your devices.</p>
+	<p><a class="btnlink" href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Subscribe in Google Calendar</a></p>
+	<p class="meta">You will get an <em>Add calendar</em> confirmation showing the address. Click <em>Add</em>.
+		If nothing happens, try the <a href="<?php echo e($result['googlealt']); ?>" target="_blank" rel="noopener noreferrer">alternate
+		link</a>, or add it by hand using the address below.</p>
+
 	<h3>Your calendar address</h3>
-	<p class="meta" style="margin:.2rem 0 .3rem;">This one line is all you need. Copy it, then follow the steps below for your calendar app.</p>
+	<p class="meta" style="margin:.2rem 0 .3rem;">For any other app, or to add it to Google by hand.</p>
 	<code class="url" id="feedurl"><?php echo e($result['feed']); ?></code>
 	<p><button type="button" class="btnlink" id="copybtn" style="border:0;cursor:pointer;">Copy address</button></p>
 </div>
 
-<h2>How to subscribe</h2>
+<h2>How to subscribe by hand</h2>
 
-<h3>Google Calendar</h3>
+<h3>Google Calendar (desktop browser only)</h3>
 <ol>
-	<li>Open <a href="<?php echo e($result['google']); ?>" target="_blank" rel="noopener noreferrer">Google Calendar &rarr; Add calendar &rarr; From URL</a>.</li>
+	<li>In Google Calendar, go to Settings &rarr; Add calendar &rarr; <em>From URL</em>.</li>
 	<li>Paste the address above into <em>URL of calendar</em>.</li>
 	<li>Click <em>Add calendar</em>.</li>
 </ol>
-<p class="meta">There is no working one-click link for this. Google's <code>?cid=</code> shortcut is widely
-	repeated online but no longer subscribes to an outside calendar address &mdash; it just opens Google Calendar and
-	quietly does nothing. The link above goes straight to the right settings screen instead, so it is one paste.</p>
 
 <h3>Apple Calendar</h3>
 <ol>
