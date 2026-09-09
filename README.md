@@ -1,10 +1,8 @@
 # Anamanta Kythings — solar calendar feed
 
-A self-hosted calendar you can subscribe to that marks the four Anamanta solar times each day, wherever you are:
+A self-hosted calendar you can subscribe to that marks the four Anamanta solar times each day, for a location you designate:
 
 **Sunrise · Solar noon · Sunset · Solar midnight**
-
-Live at **<https://kythings.walkowiaks.com/>**
 
 Solar noon here is the real thing — the moment the sun actually crosses the meridian, from PHP's
 `date_sun_info()` transit. It is not 12:00 on the clock, and depending on your longitude and the time of year the
@@ -15,8 +13,8 @@ next, so it stays correct across a year boundary rather than drifting.
 
 ## Using it
 
-Go to **<https://kythings.walkowiaks.com/>**, type a town, and it builds the subscription address for you. You
-should never need to hand-edit a query string.
+Go to the builder page, type a town, and it builds the subscription address for you. You should never need to
+hand-edit a query string.
 
 The page defaults to a five-minute event length, which is what the practice calls for, and to all four times
 enabled. A town is enough — solar times vary by seconds across a town, so a street address gives an identical
@@ -88,7 +86,7 @@ subscribe to — with it present the response is not declared as a calendar file
 Example, the four Anamanta times for Worthington, Massachusetts:
 
 ```
-https://kythings.walkowiaks.com/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&actual&noon&midnight
+https://example.com/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&actual&noon&midnight
 ```
 
 ### Known limits
@@ -116,6 +114,7 @@ The image is public and self-contained — the code is baked in, so pulling it i
     restart: unless-stopped
     environment:
       - TZ=UTC
+      - KYTHINGS_BASE_URL=https://your-domain.example
     ports:
       - "127.0.0.1:8087:8080"
 ```
@@ -124,17 +123,18 @@ The image is public and self-contained — the code is baked in, so pulling it i
 docker compose pull kythings && docker compose up -d kythings
 ```
 
-Two settings are not optional:
+Three settings are not optional:
 
+- **`KYTHINGS_BASE_URL` must be set to the URL this instance is served at** (no trailing slash needed either way).
+  There is no default — both `index.php` and `sun.php` return a `500` with a plain-text explanation rather than
+  silently pointing at the wrong host if it is unset.
 - **`display_errors` must be Off.** `sun.php` calls `date_sunrise()`/`date_sunset()`, deprecated since PHP 8.1. On
   PHP 8.5 they emit two notices per call site — thousands for a full year — and with display on those land in the
   response body and corrupt the calendar. The image sets this; if you build your own, do the same.
 - **The timezone must be UTC.** `dateToCal()` formats in the server's default timezone but labels the result `Z`.
   A non-UTC container emits wrong timestamps that still look perfectly well-formed.
 
-Both are asserted in CI rather than trusted.
-
-Set `KYTHINGS_BASE_URL` if you serve it somewhere other than `https://kythings.walkowiaks.com`.
+The latter two are asserted in CI rather than trusted.
 
 ### Security headers
 

@@ -6,6 +6,23 @@ All notable changes to this project are documented here.
 
 ### Security
 
+- Removed the deployment's own hostname, which had been hardcoded in six
+  places (`index.php`'s `$BASE_URL` default and its `GEOCODER_UA` string,
+  `sun.php`'s per-event `UID` and `URL` properties, a `Dockerfile` comment,
+  and four spots in `README.md`), so the public repo no longer names where
+  any particular instance is actually served. `KYTHINGS_BASE_URL` is now
+  **required, with no fallback default** — `index.php` and `sun.php` both
+  return a `500` with a plain-text message if it is unset, rather than
+  silently defaulting to (now nobody's) URL. `GEOCODER_UA`'s contact URL
+  now points at this repository instead of a specific deployment. The
+  per-event `UID`'s namespacing suffix changed from the old hostname to
+  `anamanta-kythings.invalid` — the RFC 2606 reserved TLD for exactly this
+  purpose, a stable string that is not meant to resolve — which is a
+  one-time change: any calendar already subscribed will see the whole feed
+  as new UIDs on its next refresh, but nothing else about the events
+  changes. CI now passes `KYTHINGS_BASE_URL` explicitly to every container
+  invocation that exercises either file, and the example `docker-compose`
+  block in the README sets it too.
 - Added the standard hardening response headers a security scan flags by
   default: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
   `Strict-Transport-Security` (one year, `includeSubDomains`, no `preload`),

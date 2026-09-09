@@ -9,14 +9,24 @@
 	Ref BRAIN-49 / BRAIN-50.
 */
 
-// Base URL the generated feed lives at. Overridable so the page is testable
-// outside production without trusting the Host header, which a caller controls.
-$BASE_URL = rtrim(getenv('KYTHINGS_BASE_URL') ?: 'https://kythings.walkowiaks.com', '/');
+// Base URL the generated feed lives at. Required, no default: this is set to
+// the actual deployment's own address, and there is no domain-agnostic value
+// that would be correct to fall back to. A missing setting should fail loudly
+// rather than silently serve URLs pointing at the wrong host.
+$BASE_URL = getenv('KYTHINGS_BASE_URL');
+if ( $BASE_URL === false || $BASE_URL === '' ){
+	http_response_code(500);
+	header('Content-Type: text/plain; charset=utf-8');
+	die('Configuration error: the KYTHINGS_BASE_URL environment variable is required and is not set.');
+}
+$BASE_URL = rtrim($BASE_URL, '/');
 
 const GEOCODER_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
 // Nominatim's usage policy requires a descriptive, contactable User-Agent.
-// Sending a generic or absent one is how you get the whole host blocked.
-const GEOCODER_UA       = 'AnamantaSolarCalendar/1.0 (+https://kythings.walkowiaks.com)';
+// Sending a generic or absent one is how you get the whole host blocked. The
+// repo URL is a stable, public identifier that works regardless of where any
+// given instance is deployed.
+const GEOCODER_UA       = 'AnamantaSolarCalendar/1.0 (+https://github.com/chefcai/anamanta-kythings)';
 const GEOCODER_TIMEOUT  = 6;
 
 /* ------------------------------------------------------------------ input -- */

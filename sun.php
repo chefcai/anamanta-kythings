@@ -9,6 +9,18 @@
 	//Google Calendar updates every 12 hours (noticed at 9:30am, 9:30pm, 1:00pm, 2:30am).
 */
 
+// Base URL this feed is served at, used for the per-event URL property below.
+// Required, no default: there is no domain-agnostic value that would be
+// correct to fall back to, so a missing setting fails loudly instead of
+// silently emitting a wrong URL into every event.
+$BASE_URL = getenv('KYTHINGS_BASE_URL');
+if ( $BASE_URL === false || $BASE_URL === '' ){
+	http_response_code(500);
+	header('Content-Type: text/plain; charset=utf-8');
+	die('Configuration error: the KYTHINGS_BASE_URL environment variable is required and is not set.');
+}
+$BASE_URL = rtrim($BASE_URL, '/');
+
 $debug = 0; //Enable forced debug mode here
 
 if ( $debug == 0 && !array_key_exists('debug', $_GET) ){
@@ -376,9 +388,9 @@ DTSTART:<?php echo dateToCal($event['start']+$gmt_math) . "\r\n"; ?>
 DTEND:<?php echo dateToCal($event['end']+$gmt_math) . "\r\n"; ?>
 DTSTAMP:<?php echo dateToCal(time()) . "\r\n"; ?>
 LAST-MODIFIED:<?php echo dateToCal(filemtime(__FILE__)) . "\r\n"; ?>
-UID:<?php echo md5($event_date . '-' . $event_key . '@kythings.walkowiaks.com') . "\r\n"; /* Keyed on the event's OWN date, not the loop variable. Two reasons. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" and made Google render the feed empty. And keying on $event_date makes the UID identical whether the feed was generated in rolling or fixed-year mode, and stable as the rolling window slides -- otherwise every refetch would look like a fresh set of events and clients would churn. */ ?>
+UID:<?php echo md5($event_date . '-' . $event_key . '@anamanta-kythings.invalid') . "\r\n"; /* Keyed on the event's OWN date, not the loop variable. Two reasons. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" and made Google render the feed empty. And keying on $event_date makes the UID identical whether the feed was generated in rolling or fixed-year mode, and stable as the rolling window slides -- otherwise every refetch would look like a fresh set of events and clients would churn. The '.invalid' suffix is the RFC 2606 reserved TLD for a namespacing string that is not meant to resolve -- this is a uniqueness key, not a real address. */ ?>
 DESCRIPTION:<?php echo escapeString($event['name'] . ' - an Anamanta solar time.') . "\r\n"; /* Deliberately short. RFC 5545 folds content lines at 75 octets, and the longest event name here is "Astronomical Twilight", so this stays inside the limit without needing a folding routine. */ ?>
-URL;VALUE=URI:<?php echo escapeString('https://kythings.walkowiaks.com/') . "\r\n"; ?>
+URL;VALUE=URI:<?php echo escapeString($BASE_URL . '/') . "\r\n"; ?>
 SUMMARY:<?php echo escapeString($event['name'] . $last_sync) . "\r\n"; //Shows up in the title of the event ?>
 END:VEVENT<?php echo "\r\n"; ?>
 <?php endforeach; ?>
