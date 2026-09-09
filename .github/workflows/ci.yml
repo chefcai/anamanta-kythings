@@ -126,10 +126,32 @@ jobs:
           fi
 
           # Desktop-only caveat must stay on the page: subscribing to an external
-          # calendar is not possible in Google's mobile apps, and its absence is
-          # what made this look broken during testing.
-          grep -qi 'not your phone' built.html \
-            || { echo "::error::desktop-only note missing from the results panel"; exit 1; }
+          # calendar is not possible in Google's or Outlook's mobile apps, and its
+          # absence is what made this look broken during testing. Matched on intent
+          # rather than an exact sentence so rewording the copy does not fail the
+          # build, while removing the warning altogether still does.
+          grep -qi 'open this page on a computer' built.html \
+            || { echo "::error::mobile/desktop caveat missing from the results panel"; exit 1; }
+
+          # All three subscribe buttons present.
+          for b in "Add to Google Calendar" "Add to Apple Calendar" "Add to Outlook"; do
+            grep -qF "$b" built.html || { echo "::error::missing button: $b"; exit 1; }
+          done
+          grep -q 'href="webcal://' built.html \
+            || { echo "::error::Apple button is not a webcal:// link"; exit 1; }
+          grep -q 'addfromweb?url=webcal%3A%2F%2F' built.html \
+            || { echo "::error::Outlook link is not a single-encoded webcal:// URL"; exit 1; }
+
+          echo "--- rolling window: must not stop at 31 December ---"
+          curl -fsS "http://127.0.0.1:8087/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&noon" -o roll.ics
+          FIRST=$(grep -m1 '^DTSTART:' roll.ics | cut -c9-16)
+          LAST=$(grep '^DTSTART:' roll.ics | tail -1 | cut -c9-16)
+          echo "    window: $FIRST .. $LAST"
+          [ "${FIRST:0:4}" != "${LAST:0:4}" ] \
+            || { echo "::error::rolling window does not cross a year boundary - the New Year defect is back"; exit 1; }
+          COUNT=$(grep -c '^BEGIN:VEVENT' roll.ics)
+          [ "$COUNT" -gt 400 ] \
+            || { echo "::error::rolling window produced only $COUNT events, expected >400"; exit 1; }
 
           echo "all smoke checks passed"
 
