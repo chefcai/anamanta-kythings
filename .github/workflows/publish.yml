@@ -51,14 +51,14 @@ jobs:
       # Re-run the full suite here rather than trusting that CI passed on some
       # earlier commit. Nothing is pushed to the registry unproven.
       - name: Regression
-        run: docker run --rm -v "$PWD":/app -w /app kythings:candidate sh /app/tests/regression.sh
+        run: docker run --rm -e KYTHINGS_BASE_URL=https://example.com -v "$PWD":/app -w /app kythings:candidate sh /app/tests/regression.sh
 
       - name: Acceptance
-        run: docker run --rm -v "$PWD":/app -w /app kythings:candidate php /app/tests/validate.php
+        run: docker run --rm -e KYTHINGS_BASE_URL=https://example.com -v "$PWD":/app -w /app kythings:candidate php /app/tests/validate.php
 
       - name: Smoke test the served response
         run: |
-          docker run -d --name smoke -p 8087:8080 kythings:candidate
+          docker run -d --name smoke -e KYTHINGS_BASE_URL=https://example.com -p 8087:8080 kythings:candidate
           for i in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:8087/index.php" && break || sleep 2; done
           curl -fsS "http://127.0.0.1:8087/sun.php?lat=42.396&lng=-72.936&gmt=-5&year=2026&length=5&actual&noon&midnight" -o feed.ics
           grep -q '^BEGIN:VCALENDAR' feed.ics
