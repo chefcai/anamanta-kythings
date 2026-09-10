@@ -50,6 +50,11 @@ If you would rather build the URL yourself, `sun.php` takes these query paramete
 | `months` | How far ahead the rolling window reaches, 1–36 | `18` |
 | `back` | Days of history kept in the window, 0–365 | `30` |
 | `year` | Generate one fixed calendar year instead of a rolling window | — |
+| `tz` | IANA timezone name (e.g. `America/New_York`), used only to resolve `override_*` times with correct daylight-saving awareness | — |
+| `override_sunrise` | Fixed clock time (`HH:MM`, 24-hour) to use instead of calculated sunrise, every day | — |
+| `override_sunset` | Fixed clock time instead of calculated sunset | — |
+| `override_noon` | Fixed clock time instead of calculated solar noon | — |
+| `override_midnight` | Fixed clock time instead of calculated solar midnight | — |
 
 ### The window rolls; it does not stop at New Year
 
@@ -89,14 +94,45 @@ Example, the four Anamanta times for Worthington, Massachusetts:
 https://example.com/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&actual&noon&midnight
 ```
 
+### Fixed-time overrides
+
+Any of the four Anamanta times can be pinned to the same clock time every day instead of the calculated solar
+time — useful if your practice marks, say, sunrise at a fixed 6:00 AM rather than whenever the sun actually comes
+up. Set `override_sunrise`, `override_sunset`, `override_noon` and/or `override_midnight` to a 24-hour `HH:MM`
+value (the builder page's clock field handles the AM/PM ↔ 24-hour conversion for you). Each of the four is
+independent — you can fix one and leave the other three calculated.
+
+A few things follow from that:
+
+- **Setting an override includes that event even if its flag is not set.** `?override_noon=12:00` on its own adds
+  Solar Noon to the feed exactly as if `?noon` had been passed too; you don't need both.
+- **An overridden event is relabeled** so it isn't mistaken for a calculated time: its calendar title gains a
+  `(fixed)` suffix and its description says so.
+- **Overrides need `tz` to be daylight-saving aware.** Without it, a fixed time is resolved against the plain `gmt`
+  offset year-round, same as everything else in this file — correct in one season and off by an hour in the other.
+  Pass `tz` as a real IANA name (e.g. `America/New_York`) and the override is resolved against that zone's actual
+  clock, DST transitions included. The builder page always sends the `tz` it already collects for you.
+- **An override's event length still comes from `length`**, the same as a calculated event of that type.
+- **A malformed or out-of-range override value is silently ignored**, falling back to the calculated time (or to no
+  event at all, if nothing else requested that type) — this endpoint never returns an error, since anything but a
+  well-formed calendar file would break every subscribed client.
+- Sunrise and sunset overrides are set independently of the shared `actual` flag, so `?override_sunrise=06:00` and
+  `?override_sunset=20:00` can be set one without the other, or both, without needing `actual` at all.
+
+```
+https://example.com/sun.php?lat=42.396&lng=-72.936&gmt=-5&length=5&actual&noon&midnight&override_sunrise=06:00&tz=America/New_York
+```
+
 ### Known limits
 
-- **`sun.php` has no `timezone` parameter.** Only `gmt`, in whole hours. (Upstream's `daylight.php` accepts an IANA
-  name; `sun.php` never has.) This costs nothing in practice: every `DTSTART` is an absolute UTC instant, so your
-  calendar app shows correct local times all year, daylight saving included. The offset only decides which local
-  day an event is filed under. The builder page takes an IANA name and converts it for you.
-- **Sunrise and sunset cannot be requested separately.** They share the `actual` flag. Hide the one you do not want
-  in your calendar app.
+- **`sun.php`'s general solar calculations have no timezone awareness** — only `gmt`, in whole hours. (Upstream's
+  `daylight.php` accepts an IANA name; `sun.php` never has for calculated events.) This costs nothing in practice:
+  every `DTSTART` is an absolute UTC instant, so your calendar app shows correct local times all year, daylight
+  saving included, for every *calculated* event. The offset only decides which local day an event is filed under.
+  `tz` is the one exception — it exists solely to resolve `override_*` times correctly across a DST transition; see
+  Fixed-time overrides above. The builder page takes an IANA name and sends both `gmt` and `tz` for you.
+- **Calculated sunrise and calculated sunset still share the `actual` flag** — hide the one you do not want in your
+  calendar app, or fix one of them to a specific time with `override_sunrise`/`override_sunset` instead.
 - **Once or twice a year, one calendar day carries two solar midnights** and the next day's arrives at 23:59 the
   evening before. Successive anti-transits are not exactly 24 hours apart, so this is unavoidable; the alternative
   would be publishing a time that is deliberately wrong.

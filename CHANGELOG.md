@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+### Added
+
+- Each of the four Anamanta times (sunrise, solar noon, sunset, solar
+  midnight) can now be pinned to a fixed daily clock time instead of the
+  calculated solar time, via new `override_sunrise`, `override_sunset`,
+  `override_noon` and `override_midnight` query parameters (`sun.php`) and a
+  matching clock-selection field under each checkbox on the builder page
+  (`index.php`), labeled identically end to end. Ref BRAIN-52.
+  - Sunrise and sunset are now independent at the architecture level — each
+    has its own trigger condition, so either can be fixed while the other
+    stays calculated, or included via its override alone without needing
+    `actual`. The builder page's existing paired sunrise/sunset checkbox UI
+    is unchanged; only the backend gained independence.
+  - Setting an override forces that event's inclusion even if its checkbox
+    or flag is not otherwise set — a filled-in override is treated as clear
+    intent.
+  - An overridden event is relabeled in the output (`SUMMARY` gains a
+    `(fixed)` suffix, `DESCRIPTION` says "a fixed time, not calculated")
+    so it is never mistaken for a calculated solar time.
+  - A new `tz` parameter (a real IANA name, already collected by the
+    builder page's timezone field) resolves override times with correct
+    daylight-saving awareness via PHP's `DateTimeZone`. Every *calculated*
+    event continues to use only the existing fixed-`gmt` convention,
+    unaffected by `tz`; without `tz`, an override falls back to that same
+    fixed-offset approximation.
+  - An override's event length still comes from the existing `length`
+    parameter, same as a calculated event of that type.
+  - A malformed or out-of-range override value is silently ignored (falls
+    back to the calculated time, or to no event at all), consistent with
+    this endpoint's existing no-error-output design.
+  - `tests/validate.php` gained 17 new acceptance checks covering DST-aware
+    resolution, relabeling, sunrise/sunset independence, forced inclusion,
+    graceful degradation on malformed input, duration, and rolling-vs-fixed
+    parity. `tests/regression.sh`'s existing 17 cases stay byte-identical
+    to upstream, since none of them pass an `override_*` parameter.
+
 ### Security
 
 - Removed the deployment's own hostname, which had been hardcoded in six
