@@ -467,6 +467,104 @@ $only_mid = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$
 check('midnight flag alone yields solar midnight and no solar noon',
 	count(byType($only_mid,'Solar Midnight')) > 360 && count(byType($only_mid,'Solar Noon')) === 0);
 
+section('BRAIN-52: fixed-time overrides');
+
+/*
+	Portland's standard-time offset is UTC-8 ($GMT above), and its real zone is
+	America/Los_Angeles, which observes PDT (UTC-7) from 2026-03-08 through
+	2026-11-01. A fixed 06:00 override with `tz` set should resolve to a
+	DIFFERENT UTC instant in January (PST) than in July (PDT); the same
+	override without `tz` must resolve to the same UTC instant both times,
+	since without a real zone name this file has no way to know DST applies at
+	all and falls back to the fixed $GMT convention documented in
+	overrideEventStart().
+*/
+$TZ = 'America/Los_Angeles';
+
+$ov_dst_jan = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=2026&length=$LEN&actual&override_sunrise=06:00&tz=$TZ"));
+$ov_dst_jul = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=2026&length=$LEN&actual&override_sunrise=06:00&tz=$TZ"));
+// Both requests generate a full year, so pull the specific dates out of each.
+$jan_fixed = eventsOnLocalDate(byType($ov_dst_jan, 'Sunrise (fixed)'), '2026-01-15', $GMT);
+$jul_fixed = eventsOnLocalDate(byType($ov_dst_jul, 'Sunrise (fixed)'), '2026-07-15', $GMT);
+
+check('with tz: 06:00 override on 2026-01-15 (PST) resolves to 14:00 UTC',
+	count($jan_fixed) === 1 && utc($jan_fixed[0]['start'], 'H:i') === '14:00',
+	count($jan_fixed) ? utc($jan_fixed[0]['start'], 'H:i') . ' UTC' : 'not found');
+check('with tz: 06:00 override on 2026-07-15 (PDT) resolves to 13:00 UTC',
+	count($jul_fixed) === 1 && utc($jul_fixed[0]['start'], 'H:i') === '13:00',
+	count($jul_fixed) ? utc($jul_fixed[0]['start'], 'H:i') . ' UTC' : 'not found');
+
+$ov_notz = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=2026&length=$LEN&actual&override_sunrise=06:00"));
+$jan_notz = eventsOnLocalDate(byType($ov_notz, 'Sunrise (fixed)'), '2026-01-15', $GMT);
+$jul_notz = eventsOnLocalDate(byType($ov_notz, 'Sunrise (fixed)'), '2026-07-15', $GMT);
+check('without tz: 06:00 override resolves to the same UTC instant year-round (no DST awareness)',
+	count($jan_notz) === 1 && count($jul_notz) === 1 && $jan_notz[0]['start'] % 86400 === $jul_notz[0]['start'] % 86400,
+	( count($jan_notz) ? utc($jan_notz[0]['start'],'H:i') : '?' ) . ' vs ' . ( count($jul_notz) ? utc($jul_notz[0]['start'],'H:i') : '?' ) . ' UTC');
+
+section('BRAIN-52: relabeling');
+
+check('overridden event SUMMARY carries the "(fixed)" suffix',
+	count($jan_fixed) === 1 && $jan_fixed[0]['summary'] === 'Sunrise (fixed)',
+	count($jan_fixed) ? $jan_fixed[0]['summary'] : 'not found');
+
+$ov_desc_ics = generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=2026&length=$LEN&actual&override_sunrise=06:00&tz=$TZ");
+// escapeString() backslash-escapes RFC 5545 special characters, commas included.
+check('overridden event DESCRIPTION says "fixed time, not calculated"',
+	strpos((string)$ov_desc_ics, 'Sunrise - a fixed time\, not calculated.') !== false);
+check('a calculated event in the same feed keeps the normal DESCRIPTION',
+	strpos((string)$ov_desc_ics, 'Sunset - an Anamanta solar time.') !== false);
+
+section('BRAIN-52: sunrise/sunset independence');
+
+// override_sunrise alone, no `actual`/`all`: sunrise appears (fixed), sunset does not appear at all.
+$only_sr_override = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&override_sunrise=06:00&tz=$TZ"));
+check('override_sunrise alone yields fixed Sunrise events',
+	count(byType($only_sr_override, 'Sunrise (fixed)')) > 300);
+check('override_sunrise alone yields no Sunset events at all',
+	count(byType($only_sr_override, 'Sunset')) === 0 && count(byType($only_sr_override, 'Sunset (fixed)')) === 0);
+
+// `actual` plus override_sunset only: sunrise stays calculated, sunset is fixed.
+$mixed = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&actual&override_sunset=20:00&tz=$TZ"));
+check('actual + override_sunset: Sunrise stays calculated (not relabeled)',
+	count(byType($mixed, 'Sunrise')) > 300 && count(byType($mixed, 'Sunrise (fixed)')) === 0);
+check('actual + override_sunset: Sunset is fixed (relabeled)',
+	count(byType($mixed, 'Sunset (fixed)')) > 300 && count(byType($mixed, 'Sunset')) === 0);
+
+section('BRAIN-52: override forces inclusion');
+
+check('override_noon alone (no noon/all flag) still yields Solar Noon events',
+	count(byType(parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&override_noon=00:00")), 'Solar Noon (fixed)')) > 300);
+check('override_midnight alone (no midnight/all flag) still yields Solar Midnight events',
+	count(byType(parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&override_midnight=00:00")), 'Solar Midnight (fixed)')) > 300);
+
+section('BRAIN-52: malformed override degrades gracefully');
+
+$bad_override = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&override_sunrise=99:99"));
+check('an out-of-range override value is ignored (no crash, no forced inclusion)',
+	count(byType($bad_override, 'Sunrise')) === 0 && count(byType($bad_override, 'Sunrise (fixed)')) === 0);
+
+$bad_override_ics = generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&all&override_noon=notatime");
+check('a non-numeric override value falls back to the calculated time instead',
+	count(byType(parseEvents($bad_override_ics), 'Solar Noon')) > 300
+	&& count(byType(parseEvents($bad_override_ics), 'Solar Noon (fixed)')) === 0);
+check('malformed override query produces no PHP diagnostics',
+	stripos((string)$bad_override_ics, 'Warning:') === false && stripos((string)$bad_override_ics, 'Notice:') === false);
+
+section('BRAIN-52: overridden event duration matches length param');
+
+$ov_len = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=45&override_noon=12:34"));
+$ov_len_noon = byType($ov_len, 'Solar Noon (fixed)');
+$bad_ov_len = 0;
+foreach ( $ov_len_noon as $e ){ if ( ($e['end'] - $e['start']) !== 45*60 ){ $bad_ov_len++; } }
+check('overridden Solar Noon honours the length param (45 min)',
+	count($ov_len_noon) > 300 && $bad_ov_len === 0, "$bad_ov_len wrong-length events");
+
+section('BRAIN-52: rolling vs fixed-year parity');
+
+$ov_rolling = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&length=$LEN&override_noon=09:15&tz=$TZ"));
+check('override applies identically in rolling mode (no year param)',
+	count(byType($ov_rolling, 'Solar Noon (fixed)')) > 400);
+
 /* ---------- summary ---------- */
 
 echo "\n" . str_repeat('-', 60) . "\n";

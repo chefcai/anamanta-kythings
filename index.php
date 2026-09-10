@@ -53,6 +53,26 @@ $in_lng    = $submitted ? trim((string)($_GET['lng']    ?? '')) : '';
 $in_tz     = $submitted ? trim((string)($_GET['tz']     ?? '')) : DEFAULT_TZ;
 $in_length = $submitted ? trim((string)($_GET['length'] ?? '')) : DEFAULT_LENGTH;
 
+// A fixed clock time instead of the calculated time for one event type, each
+// independent of the others. Ref BRAIN-52. Malformed input (only reachable by
+// hand-editing the URL -- the form field is a native time picker) degrades to
+// "no override" rather than blocking the whole form with an error.
+function normalizeClockTime($raw) {
+	if ( $raw === '' ){ return ''; }
+	if ( preg_match('/^([0-9]{1,2}):([0-9]{2})$/', $raw, $m) ){
+		$h = (int)$m[1]; $min = (int)$m[2];
+		if ( $h >= 0 && $h <= 23 && $min >= 0 && $min <= 59 ){
+			return sprintf('%02d:%02d', $h, $min);
+		}
+	}
+	return '';
+}
+
+$in_override_sunrise  = normalizeClockTime($submitted ? trim((string)($_GET['override_sunrise']  ?? '')) : '');
+$in_override_noon     = normalizeClockTime($submitted ? trim((string)($_GET['override_noon']     ?? '')) : '');
+$in_override_sunset   = normalizeClockTime($submitted ? trim((string)($_GET['override_sunset']   ?? '')) : '');
+$in_override_midnight = normalizeClockTime($submitted ? trim((string)($_GET['override_midnight'] ?? '')) : '');
+
 // A bare submit with nothing filled in should still work rather than scold.
 if ( $submitted ){
 	if ( $in_place === '' && $in_lat === '' && $in_lng === '' ){ $in_place  = DEFAULT_PLACE; }
@@ -77,6 +97,14 @@ $want = array(
 	'sunset'   => ( $submitted && $from_form ) ? isset($_GET['t_sunset'])   : true,
 	'midnight' => ( $submitted && $from_form ) ? isset($_GET['t_midnight']) : true,
 );
+
+// A fixed time for an event type is a clear signal that type is wanted, so it
+// wins over an unchecked (or unticked-by-default) box rather than being
+// silently dropped. Ref BRAIN-52.
+if ( $in_override_sunrise  !== '' ){ $want['sunrise']  = true; }
+if ( $in_override_noon     !== '' ){ $want['noon']     = true; }
+if ( $in_override_sunset   !== '' ){ $want['sunset']   = true; }
+if ( $in_override_midnight !== '' ){ $want['midnight'] = true; }
 
 $errors  = array();
 $notes   = array();
@@ -230,7 +258,20 @@ if ( $submitted ){
 			'lng'    => rtrim(rtrim(number_format($lng, 6, '.', ''), '0'), '.'),
 			'gmt'    => $gmt,
 			'length' => $length,
+			// Real IANA name, included so the feed can correctly account for
+			// daylight saving if any override_* time below is set (Ref
+			// BRAIN-52). Harmless when none are: sun.php only reads this to
+			// resolve an override.
+			'tz'     => $tzname,
 		);
+
+		// A fixed time instead of the calculated one for a given event type,
+		// independent per type. Same parameter name end-to-end, form field to
+		// generated URL. Ref BRAIN-52.
+		if ( $in_override_sunrise  !== '' ){ $params['override_sunrise']  = $in_override_sunrise; }
+		if ( $in_override_noon     !== '' ){ $params['override_noon']     = $in_override_noon; }
+		if ( $in_override_sunset   !== '' ){ $params['override_sunset']   = $in_override_sunset; }
+		if ( $in_override_midnight !== '' ){ $params['override_midnight'] = $in_override_midnight; }
 
 		$query = http_build_query($params);
 
@@ -332,12 +373,15 @@ $tz_list = timezone_identifiers_list();
 	legend { padding:0 .4rem; font-weight:600; font-size:.9rem; }
 	label { display:block; margin:.7rem 0 .2rem; font-size:.9rem; font-weight:600; }
 	.hint { font-weight:400; color:var(--dim); font-size:.85rem; }
-	input[type=text], input[type=number] { width:100%; padding:.55rem .6rem; border:1px solid var(--dim);
+	input[type=text], input[type=number], input[type=time] { width:100%; padding:.55rem .6rem; border:1px solid var(--dim);
 	       border-radius:6px; font-size:1rem; background:#fff; color:var(--ink); }
 	input:focus { outline:2px solid var(--accent); outline-offset:1px; }
 	.row { display:flex; gap:.8rem; } .row > div { flex:1; }
 	.checks label { display:flex; align-items:center; gap:.55rem; font-weight:500; margin:.45rem 0; }
-	.checks input { width:1.05rem; height:1.05rem; }
+	.checks input[type=checkbox] { width:1.05rem; height:1.05rem; }
+	.override-row { display:flex; align-items:center; gap:.6rem; margin:.15rem 0 .8rem 1.6rem; }
+	.override-row label { display:block; margin:0; font-weight:400; font-size:.85rem; color:var(--dim); flex:0 0 auto; }
+	.override-row input[type=time] { width:auto; flex:0 0 auto; }
 	button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.7rem 1.4rem;
 	       font-size:1rem; font-weight:600; cursor:pointer; }
 	button:hover { filter:brightness(1.12); }
@@ -425,15 +469,35 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 	<legend>What to include</legend>
 	<div class="checks">
 		<label for="t_sunrise"><input type="checkbox" id="t_sunrise" name="t_sunrise" value="1" <?php echo $want['sunrise']  ? 'checked' : ''; ?>> Sunrise</label>
+		<div class="override-row">
+			<label for="override_sunrise">Fixed time instead</label>
+			<input type="time" id="override_sunrise" name="override_sunrise" value="<?php echo e($in_override_sunrise); ?>">
+		</div>
 		<label for="t_noon"><input type="checkbox" id="t_noon" name="t_noon" value="1" <?php echo $want['noon']     ? 'checked' : ''; ?>> Solar noon</label>
+		<div class="override-row">
+			<label for="override_noon">Fixed time instead</label>
+			<input type="time" id="override_noon" name="override_noon" value="<?php echo e($in_override_noon); ?>">
+		</div>
 		<label for="t_sunset"><input type="checkbox" id="t_sunset" name="t_sunset" value="1" <?php echo $want['sunset']   ? 'checked' : ''; ?>> Sunset</label>
+		<div class="override-row">
+			<label for="override_sunset">Fixed time instead</label>
+			<input type="time" id="override_sunset" name="override_sunset" value="<?php echo e($in_override_sunset); ?>">
+		</div>
 		<label for="t_midnight"><input type="checkbox" id="t_midnight" name="t_midnight" value="1" <?php echo $want['midnight'] ? 'checked' : ''; ?>> Solar midnight</label>
+		<div class="override-row">
+			<label for="override_midnight">Fixed time instead</label>
+			<input type="time" id="override_midnight" name="override_midnight" value="<?php echo e($in_override_midnight); ?>">
+		</div>
 	</div>
-	<p class="hint" style="margin:.6rem 0 0;">Sunrise and sunset come as a pair from the feed, so ticking either includes both.</p>
+	<p class="hint" style="margin:.6rem 0 0;">Sunrise and sunset come as a pair from the feed, so ticking either includes both.
+		Each also has its own optional fixed time: leave it blank to use the calculated solar time, or set one to always mark
+		the same clock time instead &mdash; adjusted for daylight saving using the timezone below. Setting a fixed time
+		includes that event even if its box above is unticked, and its title in your calendar is marked <em>(fixed)</em> so
+		it is never mistaken for the calculated time.</p>
 
 	<label for="length">Event length in minutes</label>
 	<input type="number" id="length" name="length" min="1" max="1440" value="<?php echo e($in_length); ?>">
-	<p class="hint" style="margin:.35rem 0 0;">Five minutes is the default, which is what the practice calls for.</p>
+	<p class="hint" style="margin:.35rem 0 0;">Five minutes is the default, which is what the practice calls for. Applies to fixed times too.</p>
 </fieldset>
 
 <button type="submit">Build my calendar link</button>
