@@ -42,6 +42,53 @@ function escapeString($string) {
 }
 
 /*
+	Fold a single content line to RFC 5545's 75-octet limit (section 3.1).
+
+	Every property line emitted below is short today by construction --
+	event names top out at "Solar Midnight", the two DESCRIPTION sentences
+	are fixed, and BASE_URL is whatever the deployment sets once. Nothing
+	enforces any of that going forward, though: a longer BASE_URL, a longer
+	description, or a future editable event name (Ref BRAIN-52 follow-up)
+	could each produce an overlong line with no warning, and other spec
+	violations in this exact fold-adjacent area have already broken calendar
+	clients silently (the UID collision and the yearly RRULE both did, before
+	this fork fixed them). Folding removes that dependence on every value
+	staying short by chance.
+
+	A folded line is split into physical lines of at most 75 octets each
+	(continuation lines counted including their required leading space), with
+	CRLF plus one leading space introducing each continuation -- a compliant
+	parser unfolds by stripping "CRLF " sequences before reading the value.
+
+	Splits are byte-safe with respect to UTF-8: a multi-byte character is
+	never cut across two folded lines -- the cut point backs off byte by byte
+	until it lands outside a UTF-8 continuation byte (10xxxxxx).
+*/
+function foldLine($line) {
+	if ( strlen($line) <= 75 ){
+		return $line;
+	}
+
+	$folded = '';
+	$limit = 75; // First physical line carries no continuation prefix.
+
+	while ( strlen($line) > $limit ){
+		$cut = $limit;
+		while ( $cut > 0 && (ord($line[$cut]) & 0xC0) === 0x80 ){
+			$cut--; // Back off out of a UTF-8 continuation byte.
+		}
+		if ( $cut === 0 ){
+			$cut = $limit; // Pathological input (e.g. invalid UTF-8) -- cut anyway rather than loop forever.
+		}
+		$folded .= substr($line, 0, $cut) . "\r\n ";
+		$line = substr($line, $cut);
+		$limit = 74; // Continuation lines carry a leading space, so 74 + 1 = 75.
+	}
+
+	return $folded . $line;
+}
+
+/*
 	Solar transit (true solar noon) for one calendar date, as a real UTC timestamp.
 
 	$ymd is the *event* date actually emitted (i.e. already carried forward by
@@ -492,10 +539,10 @@ DTSTART:<?php echo dateToCal($event['start']+$gmt_math) . "\r\n"; ?>
 DTEND:<?php echo dateToCal($event['end']+$gmt_math) . "\r\n"; ?>
 DTSTAMP:<?php echo dateToCal(time()) . "\r\n"; ?>
 LAST-MODIFIED:<?php echo dateToCal(filemtime(__FILE__)) . "\r\n"; ?>
-UID:<?php echo md5($event_date . '-' . $event_key . '@anamanta-kythings.invalid') . "\r\n"; /* Keyed on the event's OWN date, not the loop variable. Two reasons. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" and made Google render the feed empty. And keying on $event_date makes the UID identical whether the feed was generated in rolling or fixed-year mode, and stable as the rolling window slides -- otherwise every refetch would look like a fresh set of events and clients would churn. The '.invalid' suffix is the RFC 2606 reserved TLD for a namespacing string that is not meant to resolve -- this is a uniqueness key, not a real address. */ ?>
-DESCRIPTION:<?php echo escapeString($event['name'] . ( !empty($event['overridden']) ? ' - a fixed time, not calculated.' : ' - an Anamanta solar time.' )) . "\r\n"; /* Deliberately short, same reasoning as SUMMARY below: the longest name among the four overridable event types is "Solar Midnight", well inside the 75-octet fold limit either way. !empty() rather than a bare check because civil/nautical/astronomical entries never gain an 'overridden' key at all -- they don't support overrides -- and a bare array access on a key that legitimately isn't there would warn. */ ?>
-URL;VALUE=URI:<?php echo escapeString($BASE_URL . '/') . "\r\n"; ?>
-SUMMARY:<?php echo escapeString($event['name'] . ( !empty($event['overridden']) ? ' (fixed)' : '' ) . $last_sync) . "\r\n"; //Shows up in the title of the event -- "(fixed)" marks a subscriber-designated time (Ref BRAIN-52) so it isn't mistaken for the calculated solar time ?>
+<?php echo foldLine('UID:' . md5($event_date . '-' . $event_key . '@anamanta-kythings.invalid')) . "\r\n"; /* Keyed on the event's OWN date, not the loop variable. Two reasons. Upstream used one UID for every event on a date, which RFC 5545 reads as "these are all the same event" and made Google render the feed empty. And keying on $event_date makes the UID identical whether the feed was generated in rolling or fixed-year mode, and stable as the rolling window slides -- otherwise every refetch would look like a fresh set of events and clients would churn. The '.invalid' suffix is the RFC 2606 reserved TLD for a namespacing string that is not meant to resolve -- this is a uniqueness key, not a real address. foldLine() is given the property name too, not just the value -- RFC 5545's 75-octet limit is on the whole physical line, and folding only the value would under-count it. */ ?>
+<?php echo foldLine('DESCRIPTION:' . escapeString($event['name'] . ( !empty($event['overridden']) ? ' - a fixed time, not calculated.' : ' - an Anamanta solar time.' ))) . "\r\n"; /* Short today -- the longest name among the four overridable event types is "Solar Midnight" -- but foldLine() keeps this correct if that ever changes. !empty() rather than a bare check because civil/nautical/astronomical entries never gain an 'overridden' key at all -- they don't support overrides -- and a bare array access on a key that legitimately isn't there would warn. */ ?>
+<?php echo foldLine('URL;VALUE=URI:' . escapeString($BASE_URL . '/')) . "\r\n"; ?>
+<?php echo foldLine('SUMMARY:' . escapeString($event['name'] . ( !empty($event['overridden']) ? ' (fixed)' : '' ) . $last_sync)) . "\r\n"; //Shows up in the title of the event -- "(fixed)" marks a subscriber-designated time (Ref BRAIN-52) so it isn't mistaken for the calculated solar time ?>
 END:VEVENT<?php echo "\r\n"; ?>
 <?php endforeach; ?>
 <?php

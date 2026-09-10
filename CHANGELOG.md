@@ -6,6 +6,19 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Added `foldLine()` and applied it to every variable-length event property
+  (`UID`, `DESCRIPTION`, `URL;VALUE=URI`, `SUMMARY`) so a physical content
+  line can never exceed RFC 5545's 75-octet limit. Every value emitted today
+  is short by construction (event names top out at "Solar Midnight", the
+  description sentences are fixed), so this is a no-op now -- confirmed by
+  `tests/regression.sh` staying byte-identical -- but it removes the
+  unstated assumption that a future longer `BASE_URL`, description, or
+  editable event name would stay short too. Splits are byte-safe against
+  UTF-8 (never cuts a multi-byte character across two folded lines). Covered
+  by 4 new acceptance checks in `tests/validate.php` (82 total) that force a
+  fold with a deliberately oversized `BASE_URL` and confirm every physical
+  line stays within the limit and the value survives unfolding intact.
+
 - Each of the four Anamanta times (sunrise, solar noon, sunset, solar
   midnight) can now be pinned to a fixed daily clock time instead of the
   calculated solar time, via new `override_sunrise`, `override_sunset`,

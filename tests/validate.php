@@ -565,6 +565,41 @@ $ov_rolling = parseEvents(generate("lat=$LAT&lng=$LNG&gmt=$GMT&length=$LEN&overr
 check('override applies identically in rolling mode (no year param)',
 	count(byType($ov_rolling, 'Solar Noon (fixed)')) > 400);
 
+section('RFC 5545 75-octet line folding');
+
+/*
+	Every value sun.php emits today is short by construction, so this is the
+	only way to actually exercise foldLine() rather than just proving it never
+	fires. A deliberately oversized BASE_URL forces the URL;VALUE=URI property
+	(and, transitively through the URL appearing nowhere else, nothing else)
+	past 75 octets on every event -- proving real folding happens, every
+	physical line stays within the limit, and unfolding (stripping "CRLF ")
+	reconstructs the original value exactly.
+*/
+$orig_base_url = getenv('KYTHINGS_BASE_URL');
+$long_host = 'a-deliberately-long-hostname-well-past-the-rfc-5545-fold-limit-for-testing.example.com';
+putenv("KYTHINGS_BASE_URL=https://$long_host/some/deliberately/long/path/segment/too");
+$fold_ics = generate("lat=$LAT&lng=$LNG&gmt=$GMT&year=$YEAR&length=$LEN&actual");
+putenv('KYTHINGS_BASE_URL=' . $orig_base_url);
+
+$fold_raw_lines = explode("\r\n", (string)$fold_ics);
+$fold_long_lines = array();
+foreach ( $fold_raw_lines as $l ){ if ( strlen($l) > 75 ){ $fold_long_lines[] = $l; } }
+check('no physical line exceeds 75 octets even with an oversized BASE_URL',
+	count($fold_long_lines) === 0,
+	count($fold_long_lines) . ' long lines; e.g. ' . ( $fold_long_lines ? strlen($fold_long_lines[0]) . ' octets' : '-' ));
+
+check('a URL property line was actually folded (proves this test exercises real folding, not a no-op)',
+	preg_match('/^URL;VALUE=URI:.*\r\n /m', (string)$fold_ics) === 1);
+
+// Unfold by stripping "CRLF space" sequences, then confirm the long value survived intact.
+$unfolded = str_replace("\r\n ", '', (string)$fold_ics);
+check('the long BASE_URL survives folding and unfolding intact',
+	strpos($unfolded, $long_host) !== false);
+
+check('folding produced no PHP diagnostics',
+	stripos((string)$fold_ics, 'Warning:') === false && stripos((string)$fold_ics, 'Notice:') === false);
+
 /* ---------- summary ---------- */
 
 echo "\n" . str_repeat('-', 60) . "\n";
