@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- The builder page's GET form no longer submits an empty `override_*` param
+  (e.g. `override_noon=`) for a fixed-time field left blank. `app.js` now
+  disables any empty `override_*` input right before the form reads its
+  fields for submission -- a disabled control is the one kind of field a GET
+  submission always omits, so a checked-but-unset event type's built and
+  subscribe URLs no longer carry no-op parameters. Purely cosmetic (the
+  server already ignored an empty override), but it keeps generated URLs
+  shorter and cleaner. Ref #20.
+
 ### Added
 
 - Added `foldLine()` and applied it to every variable-length event property
