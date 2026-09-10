@@ -2,13 +2,13 @@ name: Publish image
 
 # Builds and pushes the image to GHCR on merge to master, and on a version tag.
 #
-# Deliberately does NOT deploy. squirttle pulls when Cai chooses. That is what
-# keeps a merge from silently changing a live public calendar feed, and what
-# preserves the approval gate on BRAIN-48.
+# Deliberately does NOT deploy. The deployment host pulls this image when the
+# operator chooses. That is what keeps a merge from silently changing a live
+# public calendar feed, and what preserves the approval gate.
 #
-# The runner never contacts squirttle, so there is no SSH key, no Tailscale
-# credential and no inbound access anywhere in this pipeline. The only
-# credential used is the automatic GITHUB_TOKEN.
+# The runner never contacts the deployment host, so there is no SSH key, no
+# remote-access credential and no inbound access anywhere in this pipeline.
+# The only credential used is the automatic GITHUB_TOKEN.
 on:
   push:
     branches: [master]
@@ -20,9 +20,9 @@ permissions:
 
 env:
   # Kept as a literal rather than derived from the repository name, so renaming
-  # the repo cannot silently move the image path that squirttle's compose file
-  # pins. Changing this line is a deployment change: publish first, confirm the
-  # new path is pullable, and only then repoint the server.
+  # the repo cannot silently move the image path the deployment host's compose
+  # file pins. Changing this line is a deployment change: publish first,
+  # confirm the new path is pullable, and only then repoint the server.
   IMAGE: ghcr.io/${{ github.repository_owner }}/anamanta-kythings
 
 jobs:
@@ -107,9 +107,9 @@ jobs:
             [ "${GITHUB_REF}" = "refs/heads/master" ] && echo "${IMAGE_LC}:latest"
             echo '```'
             echo ""
-            echo "Deploy on squirttle:"
+            echo "Deploy on the host:"
             echo '```sh'
-            echo "cd /home/haadmin/arrs && docker compose pull kythings && docker compose up -d kythings"
+            echo "cd <compose project dir> && docker compose pull kythings && docker compose up -d kythings"
             echo '```'
             echo "Rollback: point the compose \`image:\` at a previous \`sha-\` tag and re-run the above."
           } >> "$GITHUB_STEP_SUMMARY"

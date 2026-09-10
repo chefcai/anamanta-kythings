@@ -1,8 +1,8 @@
 name: CI
 
-# Runs on every push and PR. Never publishes, never touches squirttle, uses no
-# secrets. `pull_request` (not pull_request_target) so a fork PR runs without
-# access to anything privileged.
+# Runs on every push and PR. Never publishes, never touches the deployment
+# host, uses no secrets. `pull_request` (not pull_request_target) so a fork PR
+# runs without access to anything privileged.
 on:
   push:
     branches: ['**']
