@@ -383,6 +383,7 @@ $tz_list = timezone_identifiers_list();
 	.event-row input[type=checkbox] { width:1.05rem; height:1.05rem; }
 	.override-toggle input[type=checkbox] { width:.95rem; height:.95rem; }
 	.override-row { display:flex; align-items:center; gap:.6rem; margin:.15rem 0 .8rem 1.6rem; }
+	.override-row[hidden] { display:none; }
 	.override-row input[type=time] { width:auto; flex:0 0 auto; }
 	button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.7rem 1.4rem;
 	       font-size:1rem; font-weight:600; cursor:pointer; }

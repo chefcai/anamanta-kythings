@@ -19,6 +19,14 @@ All notable changes to this project are documented here.
   right for any URL a person arrives with (checked+visible when a value is
   present, unchecked+hidden otherwise); the new script in `app.js` is only
   needed for switching the toggle after the page has loaded. Ref #21.
+  - Caught on a live spot-check right after deploying: `.override-row`'s own
+    `display:flex` was winning over the browser's default `[hidden] {
+    display:none }` rule, because author-stylesheet rules take the cascade
+    over user-agent ones at equal specificity regardless of source order --
+    so every "hidden" row was rendering anyway, fully visible, just as
+    before this change. Added `.override-row[hidden] { display:none; }`,
+    which has higher specificity than the bare `.override-row` rule and so
+    wins the same-origin tie-break correctly.
 
 ### Fixed
 
