@@ -3,7 +3,7 @@
 
 	Kept as a same-origin static file (rather than inline <script>) so the page
 	can run under a Content-Security-Policy with no 'unsafe-inline' in
-	script-src. Three independent behaviours, each a no-op if its markup is not
+	script-src. Four independent behaviours, each a no-op if its markup is not
 	present on the page:
 
 	1. Timezone field: clears on focus so the full <datalist> is visible
@@ -20,6 +20,18 @@
 	   excludes it from that read entirely -- a disabled field is the one kind
 	   of control GET serialization always omits, so this needs no follow-up
 	   re-enabling: the click that triggered it also navigates the page away.
+	4. Fixed-time toggles: each event's "Use a fixed time instead" checkbox
+	   (.override-toggle-input) shows/hides and enables/disables its own
+	   override_* field (issue #21). A disabled field is dropped from GET
+	   submission the same way #3 relies on, so this is belt-and-suspenders
+	   with #3 rather than a replacement for it -- #3 still catches a field
+	   left enabled-but-blank. The field's own value is left alone when the
+	   toggle is switched off, so re-checking it restores what was typed
+	   rather than starting over. Progressive-enhancement note: server-side
+	   rendering already gets the initial state right from any URL a person
+	   arrives with (checked+enabled when a value is present, unchecked+
+	   disabled otherwise) -- it's specifically *switching* the toggle after
+	   the page has loaded that needs this script.
 */
 (function () {
 	var tz = document.getElementById('tz');
@@ -59,5 +71,19 @@
 				}
 			}
 		});
+	}
+
+	var toggles = document.querySelectorAll('.override-toggle-input');
+	for ( var t = 0; t < toggles.length; t++ ) {
+		(function (toggle) {
+			var field = document.getElementById(toggle.dataset.controls);
+			var row = field ? field.closest('.override-row') : null;
+			if ( !field || !row ) { return; }
+			toggle.addEventListener('change', function () {
+				field.disabled = !toggle.checked;
+				row.hidden = !toggle.checked;
+				if ( toggle.checked ) { field.focus(); }
+			});
+		})(toggles[t]);
 	}
 })();

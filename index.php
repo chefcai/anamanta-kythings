@@ -377,10 +377,12 @@ $tz_list = timezone_identifiers_list();
 	       border-radius:6px; font-size:1rem; background:#fff; color:var(--ink); }
 	input:focus { outline:2px solid var(--accent); outline-offset:1px; }
 	.row { display:flex; gap:.8rem; } .row > div { flex:1; }
-	.checks label { display:flex; align-items:center; gap:.55rem; font-weight:500; margin:.45rem 0; }
-	.checks input[type=checkbox] { width:1.05rem; height:1.05rem; }
+	.event-row { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem 1.1rem; margin:.5rem 0 0; }
+	.event-row label { display:flex; align-items:center; gap:.55rem; font-weight:500; margin:0; }
+	.event-row label.override-toggle { font-weight:400; font-size:.85rem; color:var(--dim); }
+	.event-row input[type=checkbox] { width:1.05rem; height:1.05rem; }
+	.override-toggle input[type=checkbox] { width:.95rem; height:.95rem; }
 	.override-row { display:flex; align-items:center; gap:.6rem; margin:.15rem 0 .8rem 1.6rem; }
-	.override-row label { display:block; margin:0; font-weight:400; font-size:.85rem; color:var(--dim); flex:0 0 auto; }
 	.override-row input[type=time] { width:auto; flex:0 0 auto; }
 	button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.7rem 1.4rem;
 	       font-size:1rem; font-weight:600; cursor:pointer; }
@@ -469,32 +471,55 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 <fieldset>
 	<legend>What to include</legend>
 	<div class="checks">
-		<label for="t_sunrise"><input type="checkbox" id="t_sunrise" name="t_sunrise" value="1" <?php echo $want['sunrise']  ? 'checked' : ''; ?>> Sunrise</label>
-		<div class="override-row">
-			<label for="override_sunrise">Fixed time instead</label>
-			<input type="time" id="override_sunrise" name="override_sunrise" value="<?php echo e($in_override_sunrise); ?>">
+		<div class="event-row">
+			<label for="t_sunrise"><input type="checkbox" id="t_sunrise" name="t_sunrise" value="1" <?php echo $want['sunrise']  ? 'checked' : ''; ?>> Sunrise</label>
+			<label class="override-toggle" for="use_override_sunrise">
+				<input type="checkbox" id="use_override_sunrise" class="override-toggle-input" data-controls="override_sunrise" <?php echo $in_override_sunrise  !== '' ? 'checked' : ''; ?>>
+				Use a fixed time instead</label>
 		</div>
-		<label for="t_noon"><input type="checkbox" id="t_noon" name="t_noon" value="1" <?php echo $want['noon']     ? 'checked' : ''; ?>> Solar noon</label>
-		<div class="override-row">
-			<label for="override_noon">Fixed time instead</label>
-			<input type="time" id="override_noon" name="override_noon" value="<?php echo e($in_override_noon); ?>">
+		<div class="override-row"<?php echo $in_override_sunrise === '' ? ' hidden' : ''; ?>>
+			<label for="override_sunrise" class="sr-only">Fixed time for sunrise</label>
+			<input type="time" id="override_sunrise" name="override_sunrise" value="<?php echo e($in_override_sunrise); ?>"<?php echo $in_override_sunrise === '' ? ' disabled' : ''; ?>>
 		</div>
-		<label for="t_sunset"><input type="checkbox" id="t_sunset" name="t_sunset" value="1" <?php echo $want['sunset']   ? 'checked' : ''; ?>> Sunset</label>
-		<div class="override-row">
-			<label for="override_sunset">Fixed time instead</label>
-			<input type="time" id="override_sunset" name="override_sunset" value="<?php echo e($in_override_sunset); ?>">
+
+		<div class="event-row">
+			<label for="t_noon"><input type="checkbox" id="t_noon" name="t_noon" value="1" <?php echo $want['noon']     ? 'checked' : ''; ?>> Solar noon</label>
+			<label class="override-toggle" for="use_override_noon">
+				<input type="checkbox" id="use_override_noon" class="override-toggle-input" data-controls="override_noon" <?php echo $in_override_noon     !== '' ? 'checked' : ''; ?>>
+				Use a fixed time instead</label>
 		</div>
-		<label for="t_midnight"><input type="checkbox" id="t_midnight" name="t_midnight" value="1" <?php echo $want['midnight'] ? 'checked' : ''; ?>> Solar midnight</label>
-		<div class="override-row">
-			<label for="override_midnight">Fixed time instead</label>
-			<input type="time" id="override_midnight" name="override_midnight" value="<?php echo e($in_override_midnight); ?>">
+		<div class="override-row"<?php echo $in_override_noon === '' ? ' hidden' : ''; ?>>
+			<label for="override_noon" class="sr-only">Fixed time for solar noon</label>
+			<input type="time" id="override_noon" name="override_noon" value="<?php echo e($in_override_noon); ?>"<?php echo $in_override_noon === '' ? ' disabled' : ''; ?>>
+		</div>
+
+		<div class="event-row">
+			<label for="t_sunset"><input type="checkbox" id="t_sunset" name="t_sunset" value="1" <?php echo $want['sunset']   ? 'checked' : ''; ?>> Sunset</label>
+			<label class="override-toggle" for="use_override_sunset">
+				<input type="checkbox" id="use_override_sunset" class="override-toggle-input" data-controls="override_sunset" <?php echo $in_override_sunset   !== '' ? 'checked' : ''; ?>>
+				Use a fixed time instead</label>
+		</div>
+		<div class="override-row"<?php echo $in_override_sunset === '' ? ' hidden' : ''; ?>>
+			<label for="override_sunset" class="sr-only">Fixed time for sunset</label>
+			<input type="time" id="override_sunset" name="override_sunset" value="<?php echo e($in_override_sunset); ?>"<?php echo $in_override_sunset === '' ? ' disabled' : ''; ?>>
+		</div>
+
+		<div class="event-row">
+			<label for="t_midnight"><input type="checkbox" id="t_midnight" name="t_midnight" value="1" <?php echo $want['midnight'] ? 'checked' : ''; ?>> Solar midnight</label>
+			<label class="override-toggle" for="use_override_midnight">
+				<input type="checkbox" id="use_override_midnight" class="override-toggle-input" data-controls="override_midnight" <?php echo $in_override_midnight !== '' ? 'checked' : ''; ?>>
+				Use a fixed time instead</label>
+		</div>
+		<div class="override-row"<?php echo $in_override_midnight === '' ? ' hidden' : ''; ?>>
+			<label for="override_midnight" class="sr-only">Fixed time for solar midnight</label>
+			<input type="time" id="override_midnight" name="override_midnight" value="<?php echo e($in_override_midnight); ?>"<?php echo $in_override_midnight === '' ? ' disabled' : ''; ?>>
 		</div>
 	</div>
 	<p class="hint" style="margin:.6rem 0 0;">Sunrise and sunset come as a pair from the feed, so ticking either includes both.
-		Each also has its own optional fixed time: leave it blank to use the calculated solar time, or set one to always mark
-		the same clock time instead &mdash; adjusted for daylight saving using the timezone below. Setting a fixed time
-		includes that event even if its box above is unticked, and its title in your calendar is marked <em>(fixed)</em> so
-		it is never mistaken for the calculated time.</p>
+		Each also has its own optional fixed time: check &ldquo;Use a fixed time instead&rdquo; to pin it to the same clock
+		time every day instead of the calculated solar time &mdash; adjusted for daylight saving using the timezone below.
+		Setting a fixed time includes that event even if its box above is unticked, and its title in your calendar is marked
+		<em>(fixed)</em> so it is never mistaken for the calculated time.</p>
 
 	<label for="length">Event length in minutes</label>
 	<input type="number" id="length" name="length" min="1" max="1440" value="<?php echo e($in_length); ?>">

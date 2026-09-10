@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+### Changed
+
+- Each event type's "Fixed time instead" field is now hidden and disabled
+  until its own new "Use a fixed time instead" checkbox is checked, instead
+  of always being visible and editable regardless of intent. Checking it
+  reveals and enables that event's time field (and focuses it); unchecking
+  it hides and disables the field again without clearing whatever was
+  typed, so switching it back on restores the value. A disabled field is
+  never part of a GET form's submitted data, so an event left off no longer
+  contributes an override parameter at all -- the UI-side counterpart to
+  #20's `app.js` fix, addressing the same symptom by construction rather
+  than by cleanup. Server-side rendering already gets the initial state
+  right for any URL a person arrives with (checked+visible when a value is
+  present, unchecked+hidden otherwise); the new script in `app.js` is only
+  needed for switching the toggle after the page has loaded. Ref #21.
+
 ### Fixed
 
 - The "Skip to main content" link's off-screen hiding relied on a fixed
