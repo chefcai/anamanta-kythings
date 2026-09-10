@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- `app.js` is now requested as `app.js?v=<mtime>` instead of a bare
+  `app.js`. Static assets get a long `Cache-Control` (`docker/default.conf`)
+  so repeat visits don't re-fetch an unchanged file, but that same long TTL
+  meant the CDN in front of this deployment went on serving a stale
+  `app.js` for days after a new one shipped, no matter how many times the
+  origin was redeployed -- caught live, right after deploying #25/#26, when
+  the served `app.js` turned out to be a build old. A version query string
+  sidesteps it entirely: the file's own mtime changes whenever the deployed
+  file actually changes, so this URL changes too, and neither the browser
+  nor an edge cache has ever cached the new URL -- no manual cache purge
+  required, on this deploy or any future one.
+
 ### Changed
 
 - Each event type's "Fixed time instead" field is now hidden and disabled

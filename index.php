@@ -610,7 +610,19 @@ sunrise, solar noon, sunset and solar midnight &mdash; wherever you are.</p>
 </ul>
 
 <?php endif; ?>
-<script src="app.js" defer></script>
+<?php
+	// Static assets are served with a long Cache-Control (see docker/default.conf)
+	// so repeat visits don't re-fetch an unchanged file, but that same long TTL
+	// means Cloudflare's edge cache -- sitting in front of every deploy -- goes
+	// on serving a stale app.js for days after a new one ships, no matter how
+	// many times the origin is redeployed. A version query string sidesteps
+	// this entirely: whenever the deployed file actually changes, its mtime
+	// changes, this URL changes, and neither the browser nor Cloudflare has
+	// ever cached the new URL, so the new file is fetched immediately with no
+	// manual cache purge required.
+	$app_js_version = @filemtime(__DIR__ . '/app.js') ?: '1';
+?>
+<script src="app.js?v=<?php echo (int)$app_js_version; ?>" defer></script>
 
 </main>
 </body>
