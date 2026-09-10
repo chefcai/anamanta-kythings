@@ -6,6 +6,16 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- The "Skip to main content" link's off-screen hiding relied on a fixed
+  `top:-40px`, which was shorter than the link's own rendered height
+  (~44.8px padding + line-height). The ~5px difference stayed inside the
+  viewport permanently -- a visible sliver of accent-green background,
+  rounded corner included, in the top-left of every page load, focused or
+  not. Switched to `transform:translateY(-100%)` on `.skip-link` (matched by
+  `translateY(0)` on `:focus`), which hides by the element's own rendered
+  height instead of a guessed pixel value, so it can't reopen this gap if
+  the link's padding or font size changes later. Ref #23.
+
 - The builder page's GET form no longer submits an empty `override_*` param
   (e.g. `override_noon=`) for a fixed-time field left blank. `app.js` now
   disables any empty `override_*` input right before the form reads its
