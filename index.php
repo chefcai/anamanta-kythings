@@ -385,9 +385,10 @@ $tz_list = timezone_identifiers_list();
 	button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.7rem 1.4rem;
 	       font-size:1rem; font-weight:600; cursor:pointer; }
 	button:hover { filter:brightness(1.12); }
-	.skip-link { position:absolute; top:-40px; left:0; background:var(--accent); color:#fff; z-index:100;
-	       padding:.6rem 1rem; border-radius:0 0 6px 0; text-decoration:none; font-weight:600; }
-	.skip-link:focus { top:0; }
+	.skip-link { position:absolute; top:0; left:0; background:var(--accent); color:#fff; z-index:100;
+	       padding:.6rem 1rem; border-radius:0 0 6px 0; text-decoration:none; font-weight:600;
+	       transform:translateY(-100%); }
+	.skip-link:focus { transform:translateY(0); }
 	.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
 	       clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 	.ext-icon { display:inline-block; }
