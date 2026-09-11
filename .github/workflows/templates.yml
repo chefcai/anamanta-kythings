@@ -1,0 +1,31 @@
+name: ci-templates security scan
+
+# Additive to the existing Docker-native ci.yml (build/lint/regression/smoke
+# test) and publish.yml - this composes chefcai/ci-templates' shared
+# baseline + php layers so this repo gets the same Trivy/checkov/secret
+# scanning and PHP-specific security tooling every other onboarded repo
+# gets. See chefcai/ci-templates#2 and KYTH-7.
+#
+# This repo has no composer.json (plain PHP, no dependency manager) - the
+# php.yml security job's composer-audit step auto-skips for that reason,
+# and psalm (installed standalone, no Composer needed) still runs.
+#
+# Validated against this repo's real shape (no composer.json) via
+# chefcai/ci-templates#9, now merged - php.yml correctly skips the
+# composer-dependent steps and psalm (installed standalone) ran real
+# taint analysis, surfacing genuine findings in daylight.php/nighttime.php.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  baseline:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: chefcai/ci-templates/.github/workflows/baseline.yml@main
+
+  php:
+    uses: chefcai/ci-templates/.github/workflows/php.yml@main
