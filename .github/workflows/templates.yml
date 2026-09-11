@@ -10,9 +10,10 @@ name: ci-templates security scan
 # php.yml security job's composer-audit step auto-skips for that reason,
 # and psalm (installed standalone, no Composer needed) still runs.
 #
-# Pointed at the php-composer-optional branch for now to validate the
-# php.yml fix against this repo's real shape before that PR merges to
-# main - repoint to @main once chefcai/ci-templates#9 is merged.
+# Validated against this repo's real shape (no composer.json) via
+# chefcai/ci-templates#9, now merged - php.yml correctly skips the
+# composer-dependent steps and psalm (installed standalone) ran real
+# taint analysis, surfacing genuine findings in daylight.php/nighttime.php.
 
 on:
   push:
@@ -27,4 +28,4 @@ jobs:
     uses: chefcai/ci-templates/.github/workflows/baseline.yml@main
 
   php:
-    uses: chefcai/ci-templates/.github/workflows/php.yml@php-composer-optional
+    uses: chefcai/ci-templates/.github/workflows/php.yml@main
